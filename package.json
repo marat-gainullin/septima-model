@@ -1,0 +1,10 @@
+{
+  "name": "septima-model",
+  "version": "0.0.1",
+  "description": "Septima data requests manager with relations.",
+  "main": "index.js",
+  "repository": "https://github.com/marat-gainullin/septima-model.git",
+  "author": "marat-gainullin <mg@altsoft.biz>",
+  "license": "BSD-3-Clause",
+  "private": false
+}
