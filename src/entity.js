@@ -1,26 +1,20 @@
-define([
-    'core/id',
-    'core/logger',
-    './managed',
-    './orderer',
-    'remote/requests',
-    'core/extend',
-    'core/invoke'], function (
-        Id,
-        Logger,
-        M,
-        Orderer,
-        Requests,
-        extend,
-        Invoke) {
-    function Query(entityName) {
+import Id from 'core/id';
+import Logger from 'core/logger';
+import M from './managed';
+import Orderer from './orderer';
+import Requests from 'remote/requests';
+import extend from 'core/extend';
+import Invoke from 'core/invoke';
+
+class Query {
+    constructor(entityName) {
         function prepareCommandRequest(parameters) {
-            var command = {
+            const command = {
                 kind: 'command',
                 entity: entityName,
                 parameters: {}
             };
-            for (var p in parameters)
+            for (const p in parameters)
                 command.parameters[p] = parameters[p];
             return command;
         }
@@ -49,19 +43,21 @@ define([
             }
         });
     }
+}
 
-    function Entity(serverEntityName) {
+class Entity extends Array {
+    constructor(serverEntityName) {
         if (!(this instanceof Entity))
             throw "Use 'new Entity()' please";
-        Array.apply(this);
-        var self = this;
+        super();
+        const self = this;
 
         // Entity's chnge log is used as well ass model.changeLog to 
         // accomplish future changeLog replay while revert feature.
-        var changeLog = [];
+        let changeLog = [];
 
-        var scalarNavigationProperties = new Map();
-        var collectionNavigationProperties = new Map();
+        const scalarNavigationProperties = new Map();
+        const collectionNavigationProperties = new Map();
 
         function addScalarNavigation(aNavigation) {
             scalarNavigationProperties.set(aNavigation.name, aNavigation);
@@ -78,31 +74,29 @@ define([
             collectionNavigationProperties.clear();
         }
 
-        var onRequery = null;
-        var lastSnapshot = [];
-        var title = '';
-        var name = '';
-        var model = null;
-        var queryProxy = new Query(serverEntityName);
-        var elementClass = null;
-        var inRelations = new Set();
-        var outRelations = new Set();
+        let onRequery = null;
+        let lastSnapshot = [];
+        let title = '';
+        let name = '';
+        let model = null;
+        const queryProxy = new Query(serverEntityName);
+        let elementClass = null;
+        const inRelations = new Set();
+        const outRelations = new Set();
         // TODO: Add keysNames filling
-        var keysNames = new Set();
-        var requiredNames = new Set();
+        const keysNames = new Set();
+        const requiredNames = new Set();
 
 
-        var elementClass = null;
-
-        var valid = false;
-        var pending = null;
-        var pendingOnSuccess = null;
-        var pendingOnFailure = null;
-        var parameters = {};
+        let valid = false;
+        let pending = null;
+        let pendingOnSuccess = null;
+        let pendingOnFailure = null;
+        const parameters = {};
 
         function inRelatedValid() {
-            var allvalid = true;
-            inRelations.forEach(function (relation) {
+            let allvalid = true;
+            inRelations.forEach(relation => {
                 if (relation.leftEntity && !relation.leftEntity.valid) {
                     allvalid = false;
                 }
@@ -111,19 +105,19 @@ define([
         }
 
         function fromRight() {
-            var right = [];
-            outRelations.forEach(function (relation) {
+            const right = [];
+            outRelations.forEach(relation => {
                 right.push(relation.rightEntity);
             });
             return right;
         }
 
         function collectRight() {
-            var collected = new Set();
+            const collected = new Set();
             // Breadth first collecting
-            var right = fromRight();
-            for (var r = 0; r < right.length; r++) {
-                var rightEntity = right[r];
+            const right = fromRight();
+            for (let r = 0; r < right.length; r++) {
+                const rightEntity = right[r];
                 collected.add(rightEntity);
                 Array.prototype.push.apply(right, rightEntity.fromRight());
             }
@@ -135,10 +129,10 @@ define([
         }
 
         function bindParameters() {
-            inRelations.forEach(function (relation) {
-                var source = relation.leftEntity;
+            inRelations.forEach(relation => {
+                const source = relation.leftEntity;
                 if (relation.leftItem) {
-                    var leftValue;
+                    let leftValue;
                     if (relation.leftParameter) {
                         leftValue = source.params[relation.leftItem];
                     } else {
@@ -155,20 +149,20 @@ define([
             });
         }
 
-        function start(/*Low level event*/_onSuccess, /*Low level event*/_onFailure) {
+        function start(/*Low level event*/ _onSuccess, /*Low level event*/ _onFailure) {
             if (pending)
                 throw "Can't start new request, while previous request is in progress";
             if (valid)
                 throw "Can't start request for valid entity";
             if (keysNames.size === 0)
-                Logger.warning("'keysNames' for '" + name + "' are absent. Keys auto generation and 'findByKey()' will not work properly");
+                Logger.warning(`'keysNames' for '${name}' are absent. Keys auto generation and 'findByKey()' will not work properly`);
             pendingOnSuccess = _onSuccess;
             pendingOnFailure = _onFailure;
             bindParameters();
-            pending = queryProxy.requestData(parameters, function (data) {
+            pending = queryProxy.requestData(parameters, data => {
                 acceptData(data, true);
                 lastSnapshot = data;
-                var onSuccess = pendingOnSuccess;
+                const onSuccess = pendingOnSuccess;
                 pending = null;
                 pendingOnSuccess = null;
                 pendingOnFailure = null;
@@ -177,13 +171,13 @@ define([
                     onSuccess();
                 }
                 if (onRequery) {
-                    Invoke.later(function () {
+                    Invoke.later(() => {
                         onRequery();
                     });
                 }
-            }, function (reason) {
+            }, reason => {
                 valid = true;
-                var onFailure = pendingOnFailure;
+                const onFailure = pendingOnFailure;
                 pending = null;
                 pendingOnSuccess = null;
                 pendingOnFailure = null;
@@ -203,7 +197,7 @@ define([
         }
 
         function enqueueUpdate(params) {
-            var command = queryProxy.prepareCommandRequest(params);
+            const command = queryProxy.prepareCommandRequest(params);
             model.changeLog.push(command);
         }
 
@@ -227,7 +221,7 @@ define([
 
         function requery(onSuccess, onFailure) {
             if (onSuccess) {
-                var toInvalidate = collectRight();
+                const toInvalidate = collectRight();
                 toInvalidate.push(self);
                 model.start(toInvalidate, onSuccess, onFailure);
             } else {
@@ -241,7 +235,7 @@ define([
 
         function update(params, onSuccess, onFailure) {
             if (onSuccess) {
-                var command = queryProxy.prepareCommandRequest(params);
+                const command = queryProxy.prepareCommandRequest(params);
                 Requests.requestCommit([command], onSuccess, onFailure);
             } else {
                 throw "Synchronous Entity.update() method is not supported within browser client. So 'onSuccess' is required argument.";
@@ -256,30 +250,38 @@ define([
             return requiredNames.has(aPropertyName);
         }
 
-        function Insert(aEntityName) {
-            this.kind = 'insert';
-            this.entity = aEntityName;
-            this.data = {};
+        class Insert {
+            constructor(aEntityName) {
+                this.kind = 'insert';
+                this.entity = aEntityName;
+                this.data = {};
+            }
         }
-        function Delete(aEntityName) {
-            this.kind = 'delete';
-            this.entity = aEntityName;
-            this.keys = {};
+
+        class Delete {
+            constructor(aEntityName) {
+                this.kind = 'delete';
+                this.entity = aEntityName;
+                this.keys = {};
+            }
         }
-        function Update(aEntityName) {
-            this.kind = 'update';
-            this.entity = aEntityName;
-            this.keys = {};
-            this.data = {};
+
+        class Update {
+            constructor(aEntityName) {
+                this.kind = 'update';
+                this.entity = aEntityName;
+                this.keys = {};
+                this.data = {};
+            }
         }
 
         function fireSelfScalarsOppositeCollectionsChanges(aSubject, aChange) {
-            var expandingsOldValues = aChange.beforeState.selfScalarsOldValues;
-            scalarNavigationProperties.forEach(function (ormDef, scalarName) {
+            const expandingsOldValues = aChange.beforeState.selfScalarsOldValues;
+            scalarNavigationProperties.forEach((ormDef, scalarName) => {
                 if (aChange.propertyName === ormDef.baseName) {
-                    var ormDefOppositeName = ormDef.oppositeName;
-                    var expandingOldValue = expandingsOldValues[scalarName];
-                    var expandingNewValue = aSubject[scalarName];
+                    const ormDefOppositeName = ormDef.oppositeName;
+                    const expandingOldValue = expandingsOldValues[scalarName];
+                    const expandingNewValue = aSubject[scalarName];
                     M.fire(aSubject, {
                         source: aChange.source,
                         propertyName: scalarName,
@@ -289,12 +291,14 @@ define([
                     if (ormDefOppositeName) {
                         if (expandingOldValue) {
                             M.fire(expandingOldValue, {
-                                source: expandingOldValue, propertyName: ormDefOppositeName
+                                source: expandingOldValue,
+                                propertyName: ormDefOppositeName
                             });
                         }
                         if (expandingNewValue) {
                             M.fire(expandingNewValue, {
-                                source: expandingNewValue, propertyName: ormDefOppositeName
+                                source: expandingNewValue,
+                                propertyName: ormDefOppositeName
                             });
                         }
                     }
@@ -303,8 +307,8 @@ define([
         }
 
         function prepareSelfScalarsChanges(aSubject, aChange) {
-            var oldScalarValues = [];
-            scalarNavigationProperties.forEach(function (ormDef, scalarName) {
+            const oldScalarValues = [];
+            scalarNavigationProperties.forEach((ormDef, scalarName) => {
                 if (aChange.propertyName === ormDef.baseName && scalarName) {
                     oldScalarValues[scalarName] = aSubject[scalarName];
                 }
@@ -313,36 +317,37 @@ define([
         }
 
         function fireOppositeScalarsSelfCollectionsChanges(aSubject, aChange) {
-            var oppositeScalarsFirerers = aChange.beforeState.oppositeScalarsFirerers;
+            const oppositeScalarsFirerers = aChange.beforeState.oppositeScalarsFirerers;
             if (oppositeScalarsFirerers) {
-                oppositeScalarsFirerers.forEach(function (aFirerer) {
+                oppositeScalarsFirerers.forEach(aFirerer => {
                     aFirerer();
                 });
             }
-            collectionNavigationProperties.forEach(function (ormDef, collectionName) {
-                var collection = aSubject[collectionName];
-                collection.forEach(function (item) {
+            collectionNavigationProperties.forEach((ormDef, collectionName) => {
+                const collection = aSubject[collectionName];
+                collection.forEach(item => {
                     M.fire(item, {
                         source: item,
                         propertyName: ormDef.oppositeName
                     });
                 });
             });
-            collectionNavigationProperties.forEach(function (ormDef, collectionName) {
+            collectionNavigationProperties.forEach((ormDef, collectionName) => {
                 M.fire(aSubject, {
-                    source: aSubject, propertyName: collectionName
+                    source: aSubject,
+                    propertyName: collectionName
                 });
             });
         }
 
         function prepareOppositeScalarsChanges(aSubject) {
-            var firerers = [];
-            collectionNavigationProperties.forEach(function (ormDef, collectionName) {
-                var collection = aSubject[collectionName];
-                collection.forEach(function (item) {
-                    var ormDefOppositeName = ormDef.oppositeName;
+            const firerers = [];
+            collectionNavigationProperties.forEach((ormDef, collectionName) => {
+                const collection = aSubject[collectionName];
+                collection.forEach(item => {
+                    const ormDefOppositeName = ormDef.oppositeName;
                     if (ormDefOppositeName) {
-                        firerers.push(function () {
+                        firerers.push(() => {
                             M.fire(item, {
                                 source: item,
                                 propertyName: ormDefOppositeName
@@ -355,15 +360,15 @@ define([
         }
 
         function fireOppositeScalarsChanges(aSubject) {
-            var collected = prepareOppositeScalarsChanges(aSubject);
-            collected.forEach(function (aFirerer) {
+            const collected = prepareOppositeScalarsChanges(aSubject);
+            collected.forEach(aFirerer => {
                 aFirerer();
             });
         }
 
         function fireOppositeCollectionsChanges(aSubject) {
-            scalarNavigationProperties.forEach(function (ormDef, scalarName) {
-                var scalar = aSubject[scalarName];
+            scalarNavigationProperties.forEach((ormDef, scalarName) => {
+                const scalar = aSubject[scalarName];
                 if (scalar && ormDef.oppositeName) {
                     M.fire(scalar, {
                         source: scalar,
@@ -373,17 +378,17 @@ define([
             });
         }
 
-        var justInserted = null;
-        var justInsertedChange = null;
-        var orderers = {};
+        let justInserted = null;
+        let justInsertedChange = null;
+        let orderers = {};
 
-        var onChange = null;
+        let onChange = null;
 
         function managedOnChange(aSubject, aChange) {
             if (!tryToComplementInsert(aSubject, aChange)) {
-                var updateChange = new Update(queryProxy.entityName);
+                const updateChange = new Update(queryProxy.entityName);
                 // Generate changeLog keys for update
-                keysNames.forEach(function (keyName) {
+                keysNames.forEach(keyName => {
                     // Tricky processing of primary keys modification case.
                     updateChange.keys[keyName] = keyName === aChange.propertyName ? aChange.oldValue : aChange.newValue;
                 });
@@ -391,44 +396,45 @@ define([
                 changeLog.push(updateChange);
                 model.changeLog.push(updateChange);
             }
-            Object.keys(orderers).forEach(function (aOrdererKey) {
-                var aOrderer = orderers[aOrdererKey];
+            Object.keys(orderers).forEach(aOrdererKey => {
+                const aOrderer = orderers[aOrdererKey];
                 if (aOrderer.inKeys(aChange.propertyName)) {
                     aOrderer.add(aChange.source);
                 }
             });
             M.fire(aSubject, aChange);
-            fireSelfScalarsOppositeCollectionsChanges(aSubject, aChange);// Expanding change
+            fireSelfScalarsOppositeCollectionsChanges(aSubject, aChange); // Expanding change
             if (isPk(aChange.propertyName)) {
                 fireOppositeScalarsSelfCollectionsChanges(aSubject, aChange);
             }
             if (onChange) {
-                Invoke.later(function () {
+                Invoke.later(() => {
                     onChange(aChange);
                 });
             }
         }
+
         function managedBeforeChange(aSubject, aChange) {
-            var oldScalars = prepareSelfScalarsChanges(aSubject, aChange);
-            var oppositeScalarsFirerers = prepareOppositeScalarsChanges(aSubject);
-            Object.keys(orderers).forEach(function (aOrdererKey) {
-                var aOrderer = orderers[aOrdererKey];
+            const oldScalars = prepareSelfScalarsChanges(aSubject, aChange);
+            const oppositeScalarsFirerers = prepareOppositeScalarsChanges(aSubject);
+            Object.keys(orderers).forEach(aOrdererKey => {
+                const aOrderer = orderers[aOrdererKey];
                 if (aOrderer.inKeys(aChange.propertyName)) {
                     aOrderer['delete'](aChange.source);
                 }
             });
             return {
                 selfScalarsOldValues: oldScalars,
-                oppositeScalarsFirerers: oppositeScalarsFirerers
+                oppositeScalarsFirerers
             };
         }
 
         function tryToComplementInsert(aSubject, aChange) {
-            var complemented = false;
+            let complemented = false;
             if (aSubject === justInserted && isRequired(aChange.propertyName)) {
-                var met = false;
-                var iData = justInsertedChange.data;
-                for (var d in iData) {
+                let met = false;
+                const iData = justInsertedChange.data;
+                for (const d in iData) {
                     //var iv = iData[d];
                     if (d == aChange.propertyName) {
                         met = true;
@@ -444,62 +450,62 @@ define([
         }
 
         function acceptInstance(aSubject) {
-            for (var aFieldName in aSubject) {
+            for (const aFieldName in aSubject) {
                 if (typeof aSubject[aFieldName] === 'undefined')
                     aSubject[aFieldName] = null;
             }
             M.manageObject(aSubject, managedOnChange, managedBeforeChange);
             M.listenable(aSubject);
             // ORM mutable scalar properties
-            scalarNavigationProperties.forEach(function (scalarDef, scalarName) {
+            scalarNavigationProperties.forEach((scalarDef, scalarName) => {
                 Object.defineProperty(aSubject, scalarName, scalarDef);
             });
             // ORM mutable collection properties
-            collectionNavigationProperties.forEach(function (collectionDef, collectionName) {
+            collectionNavigationProperties.forEach((collectionDef, collectionName) => {
                 Object.defineProperty(aSubject, collectionName, collectionDef);
             });
         }
 
-        var onInsert = null;
-        var onDelete = null;
+        let onInsert = null;
+        let onDelete = null;
 
         M.manageArray(self, {
             spliced: function (added, deleted) {
-                added.forEach(function (aAdded) {
+                added.forEach(aAdded => {
                     justInserted = aAdded;
                     justInsertedChange = new Insert(queryProxy.entityName);
-                    keysNames.forEach(function (keyName) {
+                    keysNames.forEach(keyName => {
                         if (!aAdded[keyName]) // If key is already assigned, than we have to preserve its value
                             aAdded[keyName] = Id.generate();
                     });
-                    for (var na in aAdded) {
+                    for (const na in aAdded) {
                         justInsertedChange.data[na] = aAdded[na];
                     }
                     changeLog.push(justInsertedChange);
                     model.changeLog.push(justInsertedChange);
-                    for (var aOrdererKey in orderers) {
-                        var aOrderer = orderers[aOrdererKey];
+                    for (const aOrdererKey in orderers) {
+                        const aOrderer = orderers[aOrdererKey];
                         aOrderer.add(aAdded);
                     }
                     acceptInstance(aAdded);
                     fireOppositeScalarsChanges(aAdded);
                     fireOppositeCollectionsChanges(aAdded);
                 });
-                deleted.forEach(function (aDeleted) {
+                deleted.forEach(aDeleted => {
                     if (aDeleted === justInserted) {
                         justInserted = null;
                         justInsertedChange = null;
                     }
-                    var deleteChange = new Delete(queryProxy.entityName);
+                    const deleteChange = new Delete(queryProxy.entityName);
                     // Generate changeLog keys for delete
-                    keysNames.forEach(function (keyName) {
+                    keysNames.forEach(keyName => {
                         // Tricky processing of primary keys modification case.
                         deleteChange.keys[keyName] = aDeleted[keyName];
                     });
                     changeLog.push(deleteChange);
                     model.changeLog.push(deleteChange);
-                    for (var aOrdererKey in orderers) {
-                        var aOrderer = orderers[aOrdererKey];
+                    for (const aOrdererKey in orderers) {
+                        const aOrderer = orderers[aOrdererKey];
                         aOrderer['delete'](aDeleted);
                     }
                     fireOppositeScalarsChanges(aDeleted);
@@ -508,7 +514,7 @@ define([
                     M.unmanageObject(aDeleted);
                 });
                 if (onInsert && added.length > 0) {
-                    Invoke.later(function () {
+                    Invoke.later(() => {
                         onInsert({
                             source: self,
                             items: added
@@ -516,7 +522,7 @@ define([
                     });
                 }
                 if (onDelete && deleted.length > 0) {
-                    Invoke.later(function () {
+                    Invoke.later(() => {
                         onDelete({
                             source: self,
                             items: deleted
@@ -529,14 +535,15 @@ define([
                 });
             }
         });
-        var onScroll = null;
-        var cursor = null;
+        let onScroll = null;
+        let cursor = null;
+
         function scrolled(aValue) {
-            var oldCursor = cursor;
-            var newCursor = aValue;
+            const oldCursor = cursor;
+            const newCursor = aValue;
             cursor = aValue;
             if (onScroll) {
-                Invoke.later(function () {
+                Invoke.later(() => {
                     onScroll({
                         source: self,
                         propertyName: 'cursor',
@@ -558,29 +565,29 @@ define([
             if (typeof aCriteria === 'function' && Array.prototype.find) {
                 return Array.prototype.find.call(self, aCriteria);
             } else {
-                var keys = Object.keys(aCriteria);
+                let keys = Object.keys(aCriteria);
                 keys = keys.sort();
-                var ordererKey = keys.join(' | ');
-                var orderer = orderers[ordererKey];
+                const ordererKey = keys.join(' | ');
+                let orderer = orderers[ordererKey];
                 if (!orderer) {
                     orderer = new Orderer(keys);
-                    self.forEach(function (item) {
+                    self.forEach(item => {
                         orderer.add(item);
                     });
                     orderers[ordererKey] = orderer;
                 }
-                var found = orderer.find(aCriteria);
+                const found = orderer.find(aCriteria);
                 return found;
             }
         }
 
         function findByKey(aKeyValue) {
             if (keysNames.size > 0) {
-                var criteria = {};
-                keysNames.forEach(function (keyName) {
+                const criteria = {};
+                keysNames.forEach(keyName => {
                     criteria[keyName] = aKeyValue;
                 });
-                var found = find(criteria);
+                const found = find(criteria);
                 return found.length > 0 ? found[0] : null;
             } else {
                 return null;
@@ -592,18 +599,19 @@ define([
             return findByKey(aKeyValue);
         }
 
-        var toBeDeletedMark = '-platypus-to-be-deleted-mark';
+        const toBeDeletedMark = '-septima-to-be-deleted-mark';
+
         function remove(toBeDeleted) {
             toBeDeleted = toBeDeleted.forEach ? toBeDeleted : [toBeDeleted];
-            toBeDeleted.forEach(function (anInstance) {
+            toBeDeleted.forEach(anInstance => {
                 anInstance[toBeDeletedMark] = true;
             });
-            for (var d = self.length - 1; d >= 0; d--) {
+            for (let d = self.length - 1; d >= 0; d--) {
                 if (self[d][toBeDeletedMark]) {
                     self.splice(d, 1);
                 }
             }
-            toBeDeleted.forEach(function (anInstance) {
+            toBeDeleted.forEach(anInstance => {
                 delete anInstance[toBeDeletedMark];
             });
         }
@@ -612,15 +620,15 @@ define([
             if (aFreshData) {
                 Array.prototype.splice.call(self, 0, self.length);
             }
-            for (var s = 0; s < aData.length; s++) {
-                var dataRow = aData[s];
-                var accepted;
+            for (let s = 0; s < aData.length; s++) {
+                const dataRow = aData[s];
+                let accepted;
                 if (elementClass) {
                     accepted = new elementClass();
                 } else {
                     accepted = {};
                 }
-                for (var sp in dataRow) {
+                for (const sp in dataRow) {
                     accepted[sp] = dataRow[sp];
                 }
                 Array.prototype.push.call(self, accepted);
@@ -631,7 +639,7 @@ define([
                 source: self,
                 propertyName: 'length'
             });
-            self.forEach(function (aItem) {
+            self.forEach(aItem => {
                 fireOppositeScalarsChanges(aItem);
                 fireOppositeCollectionsChanges(aItem);
             });
@@ -640,10 +648,10 @@ define([
         // TODO: Eliminatre snapshots and transform snapshots feature.
         function commit() {
             lastSnapshot = [];
-            self.forEach(function (aItem) {
-                var cloned = {};
-                for (var aFieldName in aItem) {
-                    var typeOfField = typeof aItem[aFieldName];
+            self.forEach(aItem => {
+                const cloned = {};
+                for (const aFieldName in aItem) {
+                    const typeOfField = typeof aItem[aFieldName];
                     if (typeOfField === 'undefined' || typeOfField === 'function')
                         cloned[aFieldName] = null;
                     else
@@ -912,6 +920,5 @@ define([
             }
         });
     }
-    extend(Entity, Array);
-    return Entity;
-});
+}
+export default Entity;

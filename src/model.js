@@ -1,18 +1,15 @@
-define([
-    'core/invoke',
-    './managed',
-    'remote/requests',
-    'core/logger'], function (
-        Invoke,
-        M,
-        Requests,
-        Logger) {
-    function Model() {
-        var self = this;
-        var relations = new Set();
-        var referenceRelations = new Set();
-        var entities = new Set();
-        var changeLog = [];
+import Invoke from 'core/invoke';
+import M from './managed';
+import Requests from 'remote/requests';
+import Logger from 'core/logger';
+
+class Model {
+    constructor() {
+        const self = this;
+        const relations = new Set();
+        const referenceRelations = new Set();
+        const entities = new Set();
+        let changeLog = [];
 
         function addRelation(relation) {
             relations.add(relation);
@@ -30,8 +27,8 @@ define([
 
         function start(toInvalidate, onSuccess, onFailure) {
             function entitiesValid() {
-                var valid = true;
-                entities.forEach(function (entity) {
+                let valid = true;
+                entities.forEach(entity => {
                     if (!entity.valid) {
                         valid = false;
                     }
@@ -40,8 +37,8 @@ define([
             }
 
             function entitiesPending() {
-                var pendingMet = false;
-                entities.forEach(function (entity) {
+                let pendingMet = false;
+                entities.forEach(entity => {
                     if (entity.pending) {
                         pendingMet = true;
                     }
@@ -49,7 +46,8 @@ define([
                 return pendingMet;
             }
 
-            var failures = [];
+            const failures = [];
+
             function complete(failureReason) {
                 if (failureReason)
                     failures.push(failureReason);
@@ -69,11 +67,11 @@ define([
             }
 
             function pushInvalidToPending() {
-                entities.forEach(function (entity) {
+                entities.forEach(entity => {
                     if (!entity.valid && !entity.pending && entity.inRelatedValid()) {
-                        entity.start(function () {
+                        entity.start(() => {
                             complete(null);
-                        }, function (reason) {
+                        }, reason => {
                             complete(reason);
                         });
                     }
@@ -83,7 +81,7 @@ define([
             if (entitiesPending()) {
                 throw "Can't start new data quering process while previous is in progress";
             } else {
-                toInvalidate.forEach(function (entity) {
+                toInvalidate.forEach(entity => {
                     entity.invalidate();
                 });
                 if (entitiesValid()) { // In case of empty model, there are will not be invalid entities, even after invalidation.
@@ -97,7 +95,7 @@ define([
         }
 
         function cancel() {
-            entities.forEach(function (entity) {
+            entities.forEach(entity => {
                 if (entity.pending) {
                     entity.cancel();
                 } else if (!entity.valid) {
@@ -108,7 +106,7 @@ define([
 
         function requery(onSuccess, onFailure) {
             if (onSuccess) {
-                var toInvalidate = Array.from(entities);
+                const toInvalidate = Array.from(entities);
                 start(toInvalidate, onSuccess, onFailure);
             } else {
                 throw "Synchronous Model.requery() method is not supported within browser client. So 'onSuccess' is required argument.";
@@ -117,14 +115,14 @@ define([
 
         function revert() {
             changeLog = [];
-            entities.forEach(function (e) {
+            entities.forEach(e => {
                 e.revert();
             });
         }
 
         function commited() {
             changeLog = [];
-            entities.forEach(function (e) {
+            entities.forEach(e => {
                 e.commit();
             });
         }
@@ -136,10 +134,10 @@ define([
         function save(onSuccess, onFailure) {
             if (onSuccess) {
                 // Warning! We have to support both per entitiy changeLog and model's changeLog, because of order of changes.
-                Requests.requestCommit(changeLog, function (touched) {
+                Requests.requestCommit(changeLog, touched => {
                     commited();
                     onSuccess(touched);
-                }, function (e) {
+                }, e => {
                     rolledback();
                     onFailure(e);
                 });
@@ -152,9 +150,9 @@ define([
             this.enumerable = false;
             this.configurable = true;
             this.get = function () {
-                var criterion = {};
+                const criterion = {};
                 criterion[relation.rightField] = this[relation.leftField]; // Warning! 'this' here is data array's element!
-                var found = relation.rightEntity.find(criterion);
+                const found = relation.rightEntity.find(criterion);
                 return found && found.length === 1 ? found[0] : null;
             };
             this.set = function (aValue) {
@@ -169,16 +167,16 @@ define([
             this.enumerable = false;
             this.configurable = true;
             this.get = function () {
-                var criterion = {};
-                var targetKey = this[relation.rightField];// Warning! 'this' here is data array's element!
+                const criterion = {};
+                const targetKey = this[relation.rightField]; // Warning! 'this' here is data array's element!
                 criterion[relation.leftField] = targetKey;
-                var found = relation.leftEntity.find(criterion);
+                const found = relation.leftEntity.find(criterion);
                 M.manageArray(found, {
                     spliced: function (added, deleted) {
-                        added.forEach(function (item) {
+                        added.forEach(item => {
                             item[relation.leftField] = targetKey;
                         });
-                        deleted.forEach(function (item) {
+                        deleted.forEach(item => {
                             item[relation.leftField] = null;
                         });
                         M.fire(found, {
@@ -203,11 +201,11 @@ define([
         }
 
         function processAssociations() {
-            entities.forEach(function (entity) {
+            entities.forEach(entity => {
                 entity.clearScalarNavigations();
                 entity.clearCollectionNavigations();
             });
-            referenceRelations.forEach(function (relation) {
+            referenceRelations.forEach(relation => {
                 if (relation.scalarPropertyName)
                     relation.leftEntity.addScalarNavigation(new ScalarNavigation(relation));
                 if (relation.collectionPropertyName)
@@ -271,5 +269,5 @@ define([
             }
         });
     }
-    return Model;
-});
+}
+export default Model;
