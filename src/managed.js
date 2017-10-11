@@ -1,4 +1,5 @@
-import Logger from 'core/logger';
+import Logger from 'septima-utils/logger';
+
 const releaseName = '-septima-orm-release-func';
 /** 
  * Substitutes properties of anObject with observable properties using Object.defineProperty()
@@ -10,45 +11,43 @@ const releaseName = '-septima-orm-release-func';
 function manageObject(anObject, aOnChange, aOnBeforeChange) {
     if (!anObject[releaseName]) {
         const container = {};
-        for (const p in anObject) {
+        for (let p in anObject) {
             container[p] = anObject[p];
-            ((() => {
-                const _p = p;
-                Object.defineProperty(anObject, (`${_p}`), {
-                    enumerable: true,
-                    configurable: true,
-                    get: function() {
-                        return container[_p];
-                    },
-                    set: function(aValue) {
-                        const _oldValue = container[_p];
-                        if (_oldValue != aValue) {
-                            let _beforeState = null;
-                            if (aOnBeforeChange)
-                                _beforeState = aOnBeforeChange(anObject, {
-                                    source: anObject,
-                                    propertyName: _p,
-                                    oldValue: _oldValue,
-                                    newValue: aValue
-                                });
-                            container[_p] = aValue;
-                            aOnChange(anObject, {
+            Object.defineProperty(anObject, (`${p}`), {
+                enumerable: true,
+                configurable: true,
+                get: function () {
+                    return container[p];
+                },
+                set: function (aValue) {
+                    const _oldValue = container[p];
+                    // Warning. Don't edit as !==
+                    if (_oldValue != aValue) {
+                        let _beforeState = null;
+                        if (aOnBeforeChange)
+                            _beforeState = aOnBeforeChange(anObject, {
                                 source: anObject,
-                                propertyName: _p,
+                                propertyName: p,
                                 oldValue: _oldValue,
-                                newValue: aValue,
-                                beforeState: _beforeState
+                                newValue: aValue
                             });
-                        }
+                        container[p] = aValue;
+                        aOnChange(anObject, {
+                            source: anObject,
+                            propertyName: p,
+                            oldValue: _oldValue,
+                            newValue: aValue,
+                            beforeState: _beforeState
+                        });
                     }
-                });
-            }))();
+                }
+            });
         }
         Object.defineProperty(anObject, releaseName, {
             configurable: true,
-            value: function() {
+            value: function () {
                 delete anObject[releaseName];
-                for (const p in anObject) {
+                for (let p in anObject) {
                     const pValue = anObject[p];
                     delete anObject[p];
                     anObject[p] = pValue;
@@ -57,7 +56,7 @@ function manageObject(anObject, aOnChange, aOnBeforeChange) {
         });
     }
     return {
-        release: function() {
+        release: function () {
             anObject[releaseName]();
         }
     };
@@ -140,37 +139,37 @@ function manageArray(aTarget, aOnChange) {
         return deleted;
     }
     Object.defineProperty(aTarget, "pop", {
-        get: function() {
+        get: function () {
             return pop;
         }
     });
     Object.defineProperty(aTarget, "shift", {
-        get: function() {
+        get: function () {
             return shift;
         }
     });
     Object.defineProperty(aTarget, "push", {
-        get: function() {
+        get: function () {
             return push;
         }
     });
     Object.defineProperty(aTarget, "unshift", {
-        get: function() {
+        get: function () {
             return unshift;
         }
     });
     Object.defineProperty(aTarget, "reverse", {
-        get: function() {
+        get: function () {
             return reverse;
         }
     });
     Object.defineProperty(aTarget, "sort", {
-        get: function() {
+        get: function () {
             return sort;
         }
     });
     Object.defineProperty(aTarget, "splice", {
-        get: function() {
+        get: function () {
             return splice;
         }
     });
@@ -184,17 +183,23 @@ const fireChangeName = "-septima-change-fire-func";
 function listenable(aTarget) {
     const listeners = new Set();
     Object.defineProperty(aTarget, addListenerName, {
-        value: function(aListener) {
+        enumerable: false,
+        configurable: true,
+        value: function (aListener) {
             listeners.add(aListener);
         }
     });
     Object.defineProperty(aTarget, removeListenerName, {
-        value: function(aListener) {
+        enumerable: false,
+        configurable: true,
+        value: function (aListener) {
             listeners.delete(aListener);
         }
     });
     Object.defineProperty(aTarget, fireChangeName, {
-        value: function(aChange) {
+        enumerable: false,
+        configurable: true,
+        value: function (aChange) {
             Object.freeze(aChange);
             const _listeners = [];
             listeners.forEach(aListener => {

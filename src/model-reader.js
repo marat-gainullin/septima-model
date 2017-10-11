@@ -1,6 +1,6 @@
+import Logger from 'septima-utils/logger';
 import Model from './model';
 import Entity from './entity';
-import Logger from 'core/logger';
 
 const ENTITY_TAG_NAME = 'entity';
 const RELATION_TAG_NAME = 'relation';

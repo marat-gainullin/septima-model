@@ -1,7 +1,7 @@
-import Invoke from 'core/invoke';
+import Invoke from 'septima-utils/invoke';
+import Logger from 'septima-utils/logger';
+import Requests from 'septima-remote/requests';
 import M from './managed';
-import Requests from 'remote/requests';
-import Logger from 'core/logger';
 
 class Model {
     constructor() {

@@ -6,7 +6,7 @@
   "repository": "https://github.com/marat-gainullin/septima-model.git",
   "author": "marat-gainullin <mg@altsoft.biz>",
   "license": "BSD-3-Clause",
-  "private": false
+  "private": false,
   "scripts": {
     "test": "karma start karma.conf.js"
   },
@@ -34,9 +34,14 @@
     "karma-coverage": "^1.1.1",
     "karma-jasmine": "^1.1.0",
     "karma-jasmine-html-reporter": "^0.2.2",
+    "sinon": "^4.0.1",
     "vinyl-buffer": "^1.0.0",
     "vinyl-source-stream": "^1.1.0",
     "watchify": "^3.9.0",
     "yargs": "^9.0.1"
+  },
+  "dependencies": {
+    "septima-remote": "^0.0.3",
+    "septima-utils": "^0.0.4"
   }
 }

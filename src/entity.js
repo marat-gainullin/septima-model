@@ -1,10 +1,9 @@
-import Id from 'core/id';
-import Logger from 'core/logger';
+import Id from 'septima-utils/id';
+import Invoke from 'septima-utils/invoke';
+import Logger from 'septima-utils/logger';
+import Requests from 'septima-remote/requests';
 import M from './managed';
 import Orderer from './orderer';
-import Requests from 'remote/requests';
-import extend from 'core/extend';
-import Invoke from 'core/invoke';
 
 class Query {
     constructor(entityName) {
@@ -14,7 +13,7 @@ class Query {
                 entity: entityName,
                 parameters: {}
             };
-            for (const p in parameters)
+            for (let p in parameters)
                 command.parameters[p] = parameters[p];
             return command;
         }
@@ -47,9 +46,8 @@ class Query {
 
 class Entity extends Array {
     constructor(serverEntityName) {
-        if (!(this instanceof Entity))
-            throw "Use 'new Entity()' please";
         super();
+
         const self = this;
 
         // Entity's chnge log is used as well ass model.changeLog to 
@@ -167,13 +165,11 @@ class Entity extends Array {
                 pendingOnSuccess = null;
                 pendingOnFailure = null;
                 valid = true;
+                if (onRequery) {
+                    Invoke.later(onRequery);
+                }
                 if (onSuccess) {
                     onSuccess();
-                }
-                if (onRequery) {
-                    Invoke.later(() => {
-                        onRequery();
-                    });
                 }
             }, reason => {
                 valid = true;
@@ -390,7 +386,7 @@ class Entity extends Array {
                 // Generate changeLog keys for update
                 keysNames.forEach(keyName => {
                     // Tricky processing of primary keys modification case.
-                    updateChange.keys[keyName] = keyName === aChange.propertyName ? aChange.oldValue : aChange.newValue;
+                    updateChange.keys[keyName] = keyName === aChange.propertyName ? aChange.oldValue : aSubject[keyName];
                 });
                 updateChange.data[aChange.propertyName] = aChange.newValue;
                 changeLog.push(updateChange);
@@ -434,8 +430,8 @@ class Entity extends Array {
             if (aSubject === justInserted && isRequired(aChange.propertyName)) {
                 let met = false;
                 const iData = justInsertedChange.data;
-                for (const d in iData) {
-                    //var iv = iData[d];
+                for (let d in iData) {
+                    // Warning. Don't edit as === .
                     if (d == aChange.propertyName) {
                         met = true;
                         break;
@@ -450,9 +446,9 @@ class Entity extends Array {
         }
 
         function acceptInstance(aSubject) {
-            for (const aFieldName in aSubject) {
-                if (typeof aSubject[aFieldName] === 'undefined')
-                    aSubject[aFieldName] = null;
+            for (let fieldName in aSubject) {
+                if (typeof aSubject[fieldName] === 'undefined')
+                    aSubject[fieldName] = null;
             }
             M.manageObject(aSubject, managedOnChange, managedBeforeChange);
             M.listenable(aSubject);
@@ -469,7 +465,7 @@ class Entity extends Array {
         let onInsert = null;
         let onDelete = null;
 
-        M.manageArray(self, {
+        M.manageArray(this, {
             spliced: function (added, deleted) {
                 added.forEach(aAdded => {
                     justInserted = aAdded;
@@ -478,12 +474,12 @@ class Entity extends Array {
                         if (!aAdded[keyName]) // If key is already assigned, than we have to preserve its value
                             aAdded[keyName] = Id.generate();
                     });
-                    for (const na in aAdded) {
+                    for (let na in aAdded) {
                         justInsertedChange.data[na] = aAdded[na];
                     }
                     changeLog.push(justInsertedChange);
                     model.changeLog.push(justInsertedChange);
-                    for (const aOrdererKey in orderers) {
+                    for (let aOrdererKey in orderers) {
                         const aOrderer = orderers[aOrdererKey];
                         aOrderer.add(aAdded);
                     }
@@ -504,7 +500,7 @@ class Entity extends Array {
                     });
                     changeLog.push(deleteChange);
                     model.changeLog.push(deleteChange);
-                    for (const aOrdererKey in orderers) {
+                    for (let aOrdererKey in orderers) {
                         const aOrderer = orderers[aOrdererKey];
                         aOrderer['delete'](aDeleted);
                     }
@@ -559,7 +555,7 @@ class Entity extends Array {
                 newValue: newCursor
             });
         }
-        M.listenable(self);
+        M.listenable(this);
 
         function find(aCriteria) {
             if (typeof aCriteria === 'function' && Array.prototype.find) {
@@ -628,7 +624,7 @@ class Entity extends Array {
                 } else {
                     accepted = {};
                 }
-                for (const sp in dataRow) {
+                for (let sp in dataRow) {
                     accepted[sp] = dataRow[sp];
                 }
                 Array.prototype.push.call(self, accepted);
@@ -650,7 +646,7 @@ class Entity extends Array {
             lastSnapshot = [];
             self.forEach(aItem => {
                 const cloned = {};
-                for (const aFieldName in aItem) {
+                for (let aFieldName in aItem) {
                     const typeOfField = typeof aItem[aFieldName];
                     if (typeOfField === 'undefined' || typeOfField === 'function')
                         cloned[aFieldName] = null;
@@ -716,7 +712,7 @@ class Entity extends Array {
                 return findByKey;
             }
         });
-        Object.defineProperty(this, 'findBycore/id', {
+        Object.defineProperty(this, 'findById', {
             get: function () {
                 return findById;
             }
@@ -856,7 +852,7 @@ class Entity extends Array {
                 return addOutRelation;
             }
         });
-        Object.defineProperty(this, 'valcore/id', {
+        Object.defineProperty(this, 'valid', {
             get: function () {
                 return valid;
             },
@@ -884,7 +880,7 @@ class Entity extends Array {
                 return invalidate;
             }
         });
-        Object.defineProperty(this, 'inRelatedValcore/id', {
+        Object.defineProperty(this, 'inRelatedValid', {
             get: function () {
                 return inRelatedValid;
             }

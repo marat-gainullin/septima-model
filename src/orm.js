@@ -1,22 +1,52 @@
-import Logger from 'core/logger';
-import Requests from 'remote/requests';
-import Utils from 'core/utils';
+import Invoke from 'septima-utils/invoke';
+import Logger from 'septima-utils/logger';
+import Requests from 'septima-remote/requests';
 import readModelDocument from './model-reader';
-import Invoke from 'core/invoke';
+
 const global = window;
 
 const SERVER_ENTITY_TOUCHED_NAME = "Entity ";
 
 const loadedEntities = new Map();
 
+class Process {
+    constructor(count, onSuccess, onFailure) {
+        const reasons = [];
+        function complete(e) {
+            if (e) {
+                reasons.push(e);
+            }
+            if (--count === 0) {
+                if (reasons.length === 0) {
+                    onSuccess();
+                } else {
+                    onFailure(reasons);
+                }
+            }
+        }
+
+        Object.defineProperty(this, 'onSuccess', {
+            get: function () {
+                return function () {
+                    complete();
+                };
+            }
+        });
+        Object.defineProperty(this, 'onFailure', {
+            get: function () {
+                return function (e) {
+                    complete(e);
+                };
+            }
+        });
+    }
+}
+
 function loadEntities(entitiesNames, onSuccess, onFailure) {
     if (entitiesNames.length > 0) {
-        const process = new Utils.Process(entitiesNames.length, () => {
-            onSuccess();
-        }, aReasons => {
-            onFailure(aReasons);
-        });
+        const process = new Process(entitiesNames.length, onSuccess, onFailure);
         entitiesNames.forEach(entityName => {
+            Logger.info(`Loading ${SERVER_ENTITY_TOUCHED_NAME}${entityName} ...`);
             return Requests.requestEntity(entityName, entity => {
                 loadedEntities.set(entityName, entity);
                 process.onSuccess();
@@ -24,7 +54,6 @@ function loadEntities(entitiesNames, onSuccess, onFailure) {
                 Logger.severe(reason);
                 process.onFailure(reason);
             });
-            Logger.info(`Loading ${SERVER_ENTITY_TOUCHED_NAME}${entityName} ...`);
         });
     } else {
         Invoke.later(onSuccess);

@@ -47,13 +47,13 @@ gulp.task('lint', () => {
 });
 
 // Process scripts
-gulp.task('transpile', ['clean'], () => gulp.src(masks.scripts, {cwd: paths.src})
+gulp.task('babel', ['clean'], () => gulp.src(masks.scripts, {cwd: paths.src})
             .pipe(babel({
                 presets: ['env']
             }))
             .pipe(gulp.dest(paths.lib)));
 
-gulp.task('js', ['lint', 'transpile'], () => {
+gulp.task('code', ['lint', 'babel'], () => {
 });
 
 function indexFrom(base) {
@@ -99,7 +99,7 @@ gulp.task('package', ['index'], () => gulp.src([
         'LICENSE', 'package.json'], {cwd: paths.project})
             .pipe(filterPackageJson(pkg))
             .pipe(gulp.dest(paths.lib)));
-gulp.task('build', ['js', 'package'], () => {
+gulp.task('build', ['code', 'package'], () => {
 });
 
 gulp.task('bundle-src', ['clean'], () => {
