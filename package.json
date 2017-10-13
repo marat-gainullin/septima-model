@@ -41,7 +41,7 @@
     "yargs": "^9.0.1"
   },
   "dependencies": {
-    "septima-remote": "^0.0.3",
+    "septima-remote": "^0.0.4",
     "septima-utils": "^0.0.4"
   }
 }

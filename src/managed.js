@@ -85,90 +85,82 @@ function manageArray(aTarget, aOnChange) {
         return shifted;
     }
 
-    function push() {
-        const newLength = Array.prototype.push.apply(aTarget, arguments);
-        const added = [];
-        for (let a = 0; a < arguments.length; a++) {
-            added.push(arguments[a]);
-        }
-        aOnChange.spliced(added, []);
-        if (added.length > 0)
-            aTarget.cursor = added[added.length - 1];
+    function push(...args) {
+        const newLength = aTarget.push(...args);
+        aOnChange.spliced(args, []);
+        if (args.length > 0)
+            aTarget.cursor = args[args.length - 1];
         return newLength;
     }
 
-    function unshift() {
-        const newLength = Array.prototype.unshift.apply(aTarget, arguments);
-        const added = [];
-        for (let a = 0; a < arguments.length; a++) {
-            added.push(arguments[a]);
-        }
-        aOnChange.spliced(added, []);
-        if (added.length > 0)
-            aTarget.cursor = added[added.length - 1];
+    function unshift(...args) {
+        const newLength = aTarget.unshift(...args);
+        aOnChange.spliced(args, []);
+        if (args.length > 0)
+            aTarget.cursor = args[args.length - 1];
         return newLength;
     }
 
     function reverse() {
-        const reversed = Array.prototype.reverse.apply(aTarget);
+        const reversed = aTarget.reverse();
         if (aTarget.length > 0) {
             aOnChange.spliced([], []);
         }
         return reversed;
     }
 
-    function sort() {
-        const sorted = Array.prototype.sort.apply(aTarget, arguments);
+    function sort(...args) {
+        const sorted = aTarget.sort(...args);
         if (aTarget.length > 0) {
             aOnChange.spliced([], []);
         }
         return sorted;
     }
 
-    function splice() {
-        let beginDeleteAt = arguments[0];
+    function splice(...args) {
+        let beginDeleteAt = args[0];
         if (beginDeleteAt < 0)
             beginDeleteAt = aTarget.length - beginDeleteAt;
-        const deleted = Array.prototype.splice.apply(aTarget, arguments);
+        const deleted = aTarget.splice(...args);
         const added = [];
-        for (let a = 2; a < arguments.length; a++) {
-            const aAdded = arguments[a];
-            added.push(aAdded);
+        for (let a = 2; a < args.length; a++) {
+            const addedItem = args[a];
+            added.push(addedItem);
         }
         aOnChange.spliced(added, deleted);
         return deleted;
     }
-    Object.defineProperty(aTarget, "pop", {
+    Object.defineProperty(aTarget, 'pop', {
         get: function () {
             return pop;
         }
     });
-    Object.defineProperty(aTarget, "shift", {
+    Object.defineProperty(aTarget, 'shift', {
         get: function () {
             return shift;
         }
     });
-    Object.defineProperty(aTarget, "push", {
+    Object.defineProperty(aTarget, 'push', {
         get: function () {
             return push;
         }
     });
-    Object.defineProperty(aTarget, "unshift", {
+    Object.defineProperty(aTarget, 'unshift', {
         get: function () {
             return unshift;
         }
     });
-    Object.defineProperty(aTarget, "reverse", {
+    Object.defineProperty(aTarget, 'reverse', {
         get: function () {
             return reverse;
         }
     });
-    Object.defineProperty(aTarget, "sort", {
+    Object.defineProperty(aTarget, 'sort', {
         get: function () {
             return sort;
         }
     });
-    Object.defineProperty(aTarget, "splice", {
+    Object.defineProperty(aTarget, 'splice', {
         get: function () {
             return splice;
         }
@@ -176,9 +168,9 @@ function manageArray(aTarget, aOnChange) {
     return aTarget;
 }
 
-const addListenerName = "-septima-listener-add-func";
-const removeListenerName = "-septima-listener-remove-func";
-const fireChangeName = "-septima-change-fire-func";
+const addListenerName = '-septima-listener-add-func';
+const removeListenerName = '-septima-listener-remove-func';
+const fireChangeName = '-septima-change-fire-func';
 
 function listenable(aTarget) {
     const listeners = new Set();

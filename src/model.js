@@ -1,3 +1,5 @@
+/* global Promise */
+
 import Invoke from 'septima-utils/invoke';
 import Logger from 'septima-utils/logger';
 import Requests from 'septima-remote/requests';
@@ -25,7 +27,7 @@ class Model {
             self[entity.name] = entity;
         }
 
-        function start(toInvalidate, onSuccess, onFailure) {
+        function start(toInvalidate, manager) {
             function entitiesValid() {
                 let valid = true;
                 entities.forEach(entity => {
@@ -46,51 +48,51 @@ class Model {
                 return pendingMet;
             }
 
-            const failures = [];
-
-            function complete(failureReason) {
-                if (failureReason)
-                    failures.push(failureReason);
-                if (entitiesValid()) {
-                    if (failures.length > 0) {
-                        if (onFailure) {
-                            onFailure(failures);
-                        }
-                    } else {
-                        if (onSuccess) {
-                            onSuccess();
-                        }
-                    }
-                } else {
-                    pushInvalidToPending();
-                }
-            }
-
-            function pushInvalidToPending() {
-                entities.forEach(entity => {
-                    if (!entity.valid && !entity.pending && entity.inRelatedValid()) {
-                        entity.start(() => {
-                            complete(null);
-                        }, reason => {
-                            complete(reason);
-                        });
-                    }
-                });
+            function invalidToPending(roundManager) {
+                const entitiesRequests = [];
+                roundManager.cancel = function () {
+                    entitiesRequests.forEach((entityRequest) => {
+                        entityRequest.cancel();
+                    });
+                };
+                return Promise.all(entities
+                        .filter(entity => {
+                            return !entity.valid && !entity.pending && entity.inRelatedValid();
+                        })
+                        .map(entity => {
+                            const request = {};
+                            entitiesRequests.push(request);
+                            return entity.start(request);
+                        }));
             }
 
             if (entitiesPending()) {
-                throw "Can't start new data quering process while previous is in progress";
+                return Promise.reject("Can't start new data quering process while previous is in progress");
             } else {
                 toInvalidate.forEach(entity => {
                     entity.invalidate();
                 });
-                if (entitiesValid()) { // In case of empty model, there are will not be invalid entities, even after invalidation.
-                    if (onSuccess) {
-                        Invoke.later(onSuccess);
+                return new Promise((resolve, reject) => {
+                    const reasons = [];
+                    function nextRound() {
+                        if (entitiesValid()) {
+                            delete manager.cancel;
+                            if (reasons.length === 0) {
+                                resolve();
+                            } else {
+                                reject(reasons);
+                            }
+                        } else {
+                            invalidToPending(manager)
+                                    .then(nextRound)
+                                    .catch((roundReasons) => {
+                                        reasons.push(...roundReasons);
+                                        nextRound();
+                                    });
+                        }
                     }
-                } else {
-                    pushInvalidToPending();
-                }
+                    nextRound();
+                });
             }
         }
 
@@ -104,13 +106,9 @@ class Model {
             });
         }
 
-        function requery(onSuccess, onFailure) {
-            if (onSuccess) {
-                const toInvalidate = Array.from(entities);
-                start(toInvalidate, onSuccess, onFailure);
-            } else {
-                throw "Synchronous Model.requery() method is not supported within browser client. So 'onSuccess' is required argument.";
-            }
+        function requery(manager) {
+            const toInvalidate = Array.from(entities);
+            start(toInvalidate, manager);
         }
 
         function revert() {
@@ -131,19 +129,17 @@ class Model {
             Logger.info("Model changes are rolled back");
         }
 
-        function save(onSuccess, onFailure) {
-            if (onSuccess) {
-                // Warning! We have to support both per entitiy changeLog and model's changeLog, because of order of changes.
-                Requests.requestCommit(changeLog, touched => {
-                    commited();
-                    onSuccess(touched);
-                }, e => {
-                    rolledback();
-                    onFailure(e);
-                });
-            } else {
-                throw "'onSuccess' is required argument";
-            }
+        function save(manager) {
+            // Warning! We have to support both per entitiy changeLog and model's changeLog, because of order of changes.
+            return Requests.requestCommit(changeLog, manager)
+                    .then(touched => {
+                        commited();
+                        return touched;
+                    })
+                    .catch(ex => {
+                        rolledback();
+                        throw ex;
+                    });
         }
 
         function ScalarNavigation(relation) {

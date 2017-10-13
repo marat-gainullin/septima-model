@@ -3,6 +3,7 @@
 import Id from 'septima-utils/id';
 import Invoke from 'septima-utils/invoke';
 import Resource from 'septima-remote/resource';
+import Requests from 'septima-remote/requests';
 import Orm from '../src/orm';
 import Model from '../src/model';
 import Entity from '../src/entity';
@@ -15,7 +16,7 @@ describe('Model Orm and orderers. ', () => {
     afterAll(() => {
         XMLHttpRequest.restore();
     });
-    
+
     it('Creation Api', () => {
         const model = new Model();
         const model1 = new Orm.createModel();
@@ -48,54 +49,65 @@ describe('Model Orm and orderers. ', () => {
         expect(model.e3).toBeDefined();
     });
     it('requireEntities.success', done => {
-        Orm.requireEntities(['pets', 'all-owners'], (petsEntity, ownersEntity) => {
-            expect(petsEntity).toBeDefined();
-            expect(petsEntity.fields).toBeDefined();
-            expect(petsEntity.fields.length).toBeDefined();
-            expect(petsEntity.fields.length).toEqual(5);
-            expect(petsEntity.parameters).toBeDefined();
-            expect(petsEntity.parameters.length).toBeDefined();
-            expect(petsEntity.title).toBeDefined();
-            expect(ownersEntity).toBeDefined();
-            expect(ownersEntity.fields).toBeDefined();
-            expect(ownersEntity.fields.length).toBeDefined();
-            expect(ownersEntity.fields.length).toEqual(7);
-            expect(ownersEntity.parameters).toBeDefined();
-            expect(ownersEntity.parameters.length).toBeDefined();
-            expect(ownersEntity.title).toBeDefined();
-            done();
-        }, done.fail);
+        const request = Requests.Cancelable();
+        Orm.requireEntities(['pets', 'all-owners'], request)
+                .then((petsEntity, ownersEntity) => {
+                    expect(petsEntity).toBeDefined();
+                    expect(petsEntity.fields).toBeDefined();
+                    expect(petsEntity.fields.length).toBeDefined();
+                    expect(petsEntity.fields.length).toEqual(5);
+                    expect(petsEntity.parameters).toBeDefined();
+                    expect(petsEntity.parameters.length).toBeDefined();
+                    expect(petsEntity.title).toBeDefined();
+                    expect(ownersEntity).toBeDefined();
+                    expect(ownersEntity.fields).toBeDefined();
+                    expect(ownersEntity.fields.length).toBeDefined();
+                    expect(ownersEntity.fields.length).toEqual(7);
+                    expect(ownersEntity.parameters).toBeDefined();
+                    expect(ownersEntity.parameters.length).toBeDefined();
+                    expect(ownersEntity.title).toBeDefined();
+                    done();
+                })
+                .catch(done.fail);
+        expect(request.cancel).toBeDefined();
     });
     it('requireEntities.failure', done => {
-        Orm.requireEntities(['absent-entity'], () => {
-            fail("'Orm.requireEntities' against absent entity should lead to an error");
-            done();
-        }, e => {
-            expect(e).toBeDefined();
-            done();
-        });
+        const request = Requests.Cancelable();
+        Orm.requireEntities(['absent-entity'], request)
+                .then(() => {
+                    fail("'Orm.requireEntities' against absent entity should lead to an error");
+                    done();
+                })
+                .catch(e => {
+                    expect(e).toBeDefined();
+                    done();
+                });
+        expect(request.cancel).toBeDefined();
     });
     it("'Entity.requery()' -> Some changes -> 'Entity.revert()'", done => {
         withRemotePetsModel((model) => {
-            model.requery(() => {
-                const oldLength = model.owners.length;
-                expect(oldLength).toBeGreaterThan(1);
-                const oldValue = model.owners[0].firstname;
-                expect(model.changeLog).toBeDefined();
-                expect(model.changeLog.length).toBeDefined();
-                expect(model.changeLog.length).toEqual(0);
-                model.owners[0].firstname += Id.generate();
-                expect(model.changeLog.length).toEqual(1);
-                model.owners.push({
-                    owners_id: Id.generate()
-                });
-                expect(model.changeLog.length).toEqual(2);
-                model.revert();
-                expect(model.owners.length, oldLength);
-                expect(model.owners[0].firstname).toEqual(oldValue);
-                expect(model.changeLog.length).toEqual(0);
-                done();
-            }, done.fail);
+            const request = Requests.Cancelable();
+            model.requery(request)
+                    .then(() => {
+                        const oldLength = model.owners.length;
+                        expect(oldLength).toBeGreaterThan(1);
+                        const oldValue = model.owners[0].firstname;
+                        expect(model.changeLog).toBeDefined();
+                        expect(model.changeLog.length).toBeDefined();
+                        expect(model.changeLog.length).toEqual(0);
+                        model.owners[0].firstname += Id.generate();
+                        expect(model.changeLog.length).toEqual(1);
+                        model.owners.push({
+                            owners_id: Id.generate()
+                        });
+                        expect(model.changeLog.length).toEqual(2);
+                        model.revert();
+                        expect(model.owners.length, oldLength);
+                        expect(model.owners[0].firstname).toEqual(oldValue);
+                        expect(model.changeLog.length).toEqual(0);
+                        done();
+                    }).catch(done.fail);
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
     it('Requery graph', done => {
@@ -112,14 +124,18 @@ describe('Model Orm and orderers. ', () => {
             model.petOfOwner.onRequeried = () => {
                 petOfOwnerRequeried++;
             };
-            model.requery(() => {
-                Invoke.later(() => {
-                    expect(ownersRequeried).toEqual(1);
-                    expect(petsOfOwnerRequeried).toEqual(1);
-                    expect(petOfOwnerRequeried).toEqual(1);
-                    done();
-                });
-            }, done.fail);
+            const request = Requests.Cancelable();
+            model.requery(request)
+                    .then(() => {
+                        Invoke.later(() => {
+                            expect(ownersRequeried).toEqual(1);
+                            expect(petsOfOwnerRequeried).toEqual(1);
+                            expect(petOfOwnerRequeried).toEqual(1);
+                            done();
+                        });
+                    })
+                    .catch(done.fail);
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
     it("Requery partial graph with 'Entity.requery() with dependents'", done => {
@@ -136,22 +152,27 @@ describe('Model Orm and orderers. ', () => {
             model.petOfOwner.onRequeried = () => {
                 petOfOwnerRequeried++;
             };
-            model.owners.requery(() => {
-                Invoke.later(() => {
-                    expect(ownersRequeried).toEqual(1);
-                    expect(petsOfOwnerRequeried).toEqual(1);
-                    expect(petOfOwnerRequeried).toEqual(1);
-                    done();
-                });
-            }, done.fail);
+            const request = Requests.Cancelable();
+            model.owners.requery(request)
+                    .then(() => {
+                        Invoke.later(() => {
+                            expect(ownersRequeried).toEqual(1);
+                            expect(petsOfOwnerRequeried).toEqual(1);
+                            expect(petOfOwnerRequeried).toEqual(1);
+                            done();
+                        });
+                    })
+                    .catch(done.fail);
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
     it("Requery graph after 'Model.cancel()' after one entity requeried", done => {
         withRemotePetsModel((model) => {
+            const request = Requests.Cancelable();
             let ownersRequeried = 0;
             model.owners.onRequeried = () => {
                 ownersRequeried++;
-                model.cancel();
+                request.cancel();
             };
             let petsOfOwnerRequeried = 0;
             model.petsOfOwner.onRequeried = () => {
@@ -161,18 +182,21 @@ describe('Model Orm and orderers. ', () => {
             model.petOfOwner.onRequeried = () => {
                 petOfOwnerRequeried++;
             };
-            model.requery(() => {
-                done.fail("Success callback of requery shouldn't be called after 'Model.cancel()'");
-            }, reason => {
-                expect(reason).toBeDefined();
-                expect(ownersRequeried).toEqual(1);
-                expect(model.owners.length).toBeGreaterThan(0);
-                expect(petsOfOwnerRequeried).toEqual(0);
-                expect(model.petsOfOwner.length).toEqual(0);
-                expect(petOfOwnerRequeried).toEqual(0);
-                expect(model.petOfOwner.length).toEqual(0);
-                done();
-            });
+            model.requery(request)
+                    .then(() => {
+                        done.fail("Success callback of requery shouldn't be called after 'Model.cancel()'");
+                    })
+                    .catch(reason => {
+                        expect(reason).toBeDefined();
+                        expect(ownersRequeried).toEqual(1);
+                        expect(model.owners.length).toBeGreaterThan(0);
+                        expect(petsOfOwnerRequeried).toEqual(0);
+                        expect(model.petsOfOwner.length).toEqual(0);
+                        expect(petOfOwnerRequeried).toEqual(0);
+                        expect(model.petOfOwner.length).toEqual(0);
+                        done();
+                    });
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
     it("Requery graph after 'Model.cancel()'.immediate", done => {
@@ -189,19 +213,23 @@ describe('Model Orm and orderers. ', () => {
             model.petOfOwner.onRequeried = () => {
                 petOfOwnerRequeried++;
             };
-            model.requery(() => {
-                done.fail("Success callback of requery shouldn't be called after 'Model.cancel()'");
-            }, reason => {
-                expect(reason).toBeDefined();
-                expect(ownersRequeried).toEqual(0);
-                expect(model.owners.length).toEqual(0);
-                expect(petsOfOwnerRequeried).toEqual(0);
-                expect(model.petsOfOwner.length).toEqual(0);
-                expect(petOfOwnerRequeried).toEqual(0);
-                expect(model.petOfOwner.length).toEqual(0);
-                done();
-            });
-            model.cancel();
+            const request = Requests.Cancelable();
+            model.requery(request)
+                    .then(() => {
+                        done.fail("Success callback of requery shouldn't be called after 'Model.cancel()'");
+                    })
+                    .catch(reason => {
+                        expect(reason).toBeDefined();
+                        expect(ownersRequeried).toEqual(0);
+                        expect(model.owners.length).toEqual(0);
+                        expect(petsOfOwnerRequeried).toEqual(0);
+                        expect(model.petsOfOwner.length).toEqual(0);
+                        expect(petOfOwnerRequeried).toEqual(0);
+                        expect(model.petOfOwner.length).toEqual(0);
+                        done();
+                    });
+            expect(request.cancel).toBeDefined();
+            request.cancel();
         }, done.fail);
     });
     it("Entities' events", done => {
@@ -234,96 +262,121 @@ describe('Model Orm and orderers. ', () => {
                 expect(event.items).toBeDefined();
             };
             expect(model.owners.onRequery === model.owners.onRequeried).toBeTruthy();
-            model.requery(() => {
-                expect(onRequiredCalled).toEqual(1);
-                const newOwner = {
-                    // Note! Only changes of those properties, that are in push/splice/unshift will be observable
-                    // for changeLog and for onChange events!
-                    owners_id: Id.generate(),
-                    firstname: 'test-owner'
-                };
-                model.owners.push(newOwner);
-                newOwner.firstname = 'test-owner-edited';
-                model.owners.remove(newOwner);
-                Invoke.later(() => {
-                    expect(onInsertCalled).toEqual(1);
-                    expect(onChangeCalled).toEqual(1);
-                    expect(onDeleteCalled).toEqual(1);
-                    done();
-                });
-            }, done.fail);
+            const request = Requests.Cancelable();
+            model.requery(request)
+                    .then(() => {
+                        expect(onRequiredCalled).toEqual(1);
+                        const newOwner = {
+                            // Note! Only changes of those properties, that are in push/splice/unshift will be observable
+                            // for changeLog and for onChange events!
+                            owners_id: Id.generate(),
+                            firstname: 'test-owner'
+                        };
+                        model.owners.push(newOwner);
+                        newOwner.firstname = 'test-owner-edited';
+                        model.owners.remove(newOwner);
+                        Invoke.later(() => {
+                            expect(onInsertCalled).toEqual(1);
+                            expect(onChangeCalled).toEqual(1);
+                            expect(onDeleteCalled).toEqual(1);
+                            done();
+                        });
+                    })
+                    .catch(done.fail);
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
     it("Requery of model with command like entities", done => {
         withRemotePetsModel((model) => {
             model.addEntity(new Entity('add-pet'));
-            model.requery(() => {
-                done.fail("'model.requery()' with command like entity inside, should lead to an error");
-            }, reason => {
-                expect(reason).toBeDefined();
-                done();
-            });
+            const request = Requests.Cancelable();
+            model.requery(request)
+                    .then(() => {
+                        done.fail("'model.requery()' with command like entity inside, should lead to an error");
+                    })
+                    .catch(reason => {
+                        expect(reason).toBeDefined();
+                        done();
+                    });
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
 
     it("Extra and unknown to a backend properties", done => {
         withRemotePetsModel((model) => {
-            model.requery(() => {
-                model.owners[0].name += '-edited by test';
-                const testOwner = {
-                    owners_id: Id.generate(),
-                    unknownproperty: 'should not be considered while translating to database'
-                };
-                model.owners.push(testOwner);
-                model.save(result => {
-                    expect(result).toBeDefined();
-                    expect(result).toBeGreaterThanOrEqual(1);
-                    done();
-                }, done.fail);
-            }, done.fail);
+            const request = Requests.Cancelable();
+            model.requery(request)
+                    .then(() => {
+                        model.owners[0].name += '-edited by test';
+                        const testOwner = {
+                            owners_id: Id.generate(),
+                            unknownproperty: 'should not be considered while translating within a backend.'
+                        };
+                        model.owners.push(testOwner);
+                        return model.save();
+                    })
+                    .then(result => {
+                        expect(result).toBeDefined();
+                        expect(result).toBeGreaterThanOrEqual(1);
+                        done();
+                    })
+                    .catch(done.fail);
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
     it("'Entity.query()' -> 'Entity.append()' chain", done => {
         withRemotePetsModel(model => {
-            model.owners.query({}, owners => {
-                expect(owners).toBeDefined();
-                expect(owners.length).toBeDefined();
-                expect(owners.length).toBeGreaterThan(1);
-                expect(model.owners.length).toEqual(0);
-                model.owners.append(owners);
-                expect(model.owners.length).toBeGreaterThan(1);
-                done();
-            }, done.fail);
+            const request = Requests.Cancelable();
+            model.owners.query({}, request)
+                    .then(owners => {
+                        expect(owners).toBeDefined();
+                        expect(owners.length).toBeDefined();
+                        expect(owners.length).toBeGreaterThan(1);
+                        expect(model.owners.length).toEqual(0);
+                        model.owners.append(owners);
+                        expect(model.owners.length).toBeGreaterThan(1);
+                        done();
+                    })
+                    .catch(done.fail);
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
     it("'Entity.update()'.params in order", done => {
         withRemotePetsModel((model) => {
             const addPet = new Entity('add-pet');
             model.addEntity(addPet);
+            const request = Requests.Cancelable();
             addPet.update({
                 id: Id.generate(),
                 ownerId: 142841834950629,
                 typeId: 142841300122653,
                 name: 'test-pet-1'
-            }, result => {
-                expect(result).toBeDefined();
-                done();
-            }, done.fail);
+            }, request)
+                    .then(result => {
+                        expect(result).toBeDefined();
+                        done();
+                    })
+                    .catch(done.fail);
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
     it("'Entity.update()'.params out of order", done => {
         withRemotePetsModel((model) => {
             const addPet = new Entity('add-pet');
             model.addEntity(addPet);
+            const request = Requests.Cancelable();
             addPet.update({
                 id: Id.generate(),
                 typeId: 142841300122653,
                 ownerId: 142841834950629,
                 name: 'test-pet-2'
-            }, result => {
-                expect(result).toBeDefined();
-                done();
-            }, done.fail);
+            }, request)
+                    .then(result => {
+                        expect(result).toBeDefined();
+                        done();
+                    })
+                    .catch(done.fail);
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
     it("'Entity.enqueueUpdate()'", done => {
@@ -336,30 +389,42 @@ describe('Model Orm and orderers. ', () => {
                 ownerId: 142841834950629,
                 name: 'test-pet-3'
             });
-            model.save(result => {
-                expect(result).toBeDefined();
-                done();
-            }, done.fail);
+            const request = Requests.Cancelable();
+            model.save(request)
+                    .then(result => {
+                        expect(result).toBeDefined();
+                        done();
+                    })
+                    .catch(done.fail);
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
     it("'Model.save()'", done => {
         withRemotePetsModel((model) => {
-            model.requery(() => {
-                const newOwnerId = Id.generate();
-                const updatedOwnerId = model.owners[0].owners_id;
-                const upatedFirstName = model.owners[0].firstname + '-edited by test';
-                model.owners[0].firstname = upatedFirstName;
-                const testOwner = {
-                    owners_id: newOwnerId,
-                    firstname: 'test-owner-name',
-                    lastname: `test-owner-surname-${newOwnerId}`,
-                    email: 'john@doe.com'
-                };
-                model.owners.push(testOwner);
-                model.save(result => {
-                    expect(result).toBeDefined();
-                    expect(result).toBeGreaterThanOrEqual(1);
-                    model.requery(() => {
+            const request = Requests.Cancelable();
+            const newOwnerId = Id.generate();
+            let updatedOwnerId;
+            let upatedFirstName;
+            model.requery(request)
+                    .then(() => {
+                        updatedOwnerId = model.owners[0].owners_id;
+                        upatedFirstName = model.owners[0].firstname + '-edited by test';
+                        model.owners[0].firstname = upatedFirstName;
+                        const testOwner = {
+                            owners_id: newOwnerId,
+                            firstname: 'test-owner-name',
+                            lastname: `test-owner-surname-${newOwnerId}`,
+                            email: 'john@doe.com'
+                        };
+                        model.owners.push(testOwner);
+                        return model.save();
+                    })
+                    .then(result => {
+                        expect(result).toBeDefined();
+                        expect(result).toBeGreaterThanOrEqual(1);
+                        return model.requery();
+                    })
+                    .then(() => {
                         const justUpdatedOwner = model.owners.findByKey(updatedOwnerId);
                         expect(justUpdatedOwner).toBeDefined();
                         expect(justUpdatedOwner.firstname).toEqual(upatedFirstName);
@@ -368,12 +433,9 @@ describe('Model Orm and orderers. ', () => {
                         expect(justAddedOwner).toBeDefined();
                         expect(justAddedOwner.lastname).toEqual(`test-owner-surname-${newOwnerId}`);
                         done();
-                    }, reason => {
-                        fail(reason);
-                        done();
-                    });
-                }, done.fail);
-            }, done.fail);
+                    })
+                    .catch(done.fail);
+            expect(request.cancel).toBeDefined();
         }, done.fail);
     });
 

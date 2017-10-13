@@ -18,8 +18,8 @@ class Query {
             return command;
         }
 
-        function requestData(parameters, onSuccess, onFailure) {
-            return Requests.requestData(entityName, parameters, onSuccess, onFailure);
+        function requestData(parameters, manager) {
+            return Requests.requestData(entityName, parameters, manager);
         }
 
         Object.defineProperty(this, 'entityName', {
@@ -88,8 +88,7 @@ class Entity extends Array {
 
         let valid = false;
         let pending = null;
-        let pendingOnSuccess = null;
-        let pendingOnFailure = null;
+
         const parameters = {};
 
         function inRelatedValid() {
@@ -117,7 +116,7 @@ class Entity extends Array {
             for (let r = 0; r < right.length; r++) {
                 const rightEntity = right[r];
                 collected.add(rightEntity);
-                Array.prototype.push.apply(right, rightEntity.fromRight());
+                right.push(...rightEntity.fromRight());
             }
             return Array.from(collected);
         }
@@ -147,49 +146,30 @@ class Entity extends Array {
             });
         }
 
-        function start(/*Low level event*/ _onSuccess, /*Low level event*/ _onFailure) {
+        function start(manager) {
             if (pending)
-                throw "Can't start new request, while previous request is in progress";
+                throw "Can't start new data request, while previous data request is in progress";
             if (valid)
-                throw "Can't start request for valid entity";
+                throw "Can't start data request for valid entity";
             if (keysNames.size === 0)
                 Logger.warning(`'keysNames' for '${name}' are absent. Keys auto generation and 'findByKey()' will not work properly`);
-            pendingOnSuccess = _onSuccess;
-            pendingOnFailure = _onFailure;
             bindParameters();
-            pending = queryProxy.requestData(parameters, data => {
-                acceptData(data, true);
-                lastSnapshot = data;
-                const onSuccess = pendingOnSuccess;
-                pending = null;
-                pendingOnSuccess = null;
-                pendingOnFailure = null;
-                valid = true;
-                if (onRequery) {
-                    Invoke.later(onRequery);
-                }
-                if (onSuccess) {
-                    onSuccess();
-                }
-            }, reason => {
-                valid = true;
-                const onFailure = pendingOnFailure;
-                pending = null;
-                pendingOnSuccess = null;
-                pendingOnFailure = null;
-                if (onFailure) {
-                    onFailure(reason);
-                }
-            });
-        }
-
-        function cancel() {
-            if (pending) {
-                pending.cancel();
-                return true;
-            } else {
-                return false;
-            }
+            pending = queryProxy.requestData(parameters, manager)
+                    .then(data => {
+                        acceptData(data, true);
+                        lastSnapshot = data;
+                        pending = null;
+                        valid = true;
+                        if (onRequery) {
+                            Invoke.later(onRequery);
+                        }
+                    })
+                    .catch(reason => {
+                        valid = true;
+                        pending = null;
+                        throw reason;
+                    });
+            return pending;
         }
 
         function enqueueUpdate(params) {
@@ -197,45 +177,23 @@ class Entity extends Array {
             model.changeLog.push(command);
         }
 
-        function executeUpdate(onSuccess, onFailure) {
-            Logger.warning('Entity.executeUpdate() is deprecated, Use Entity.update() instead.');
-            update(onSuccess, onFailure);
+        function requestData(params, manager) {
+            return queryProxy.requestData(params, manager);
         }
 
-        function execute(onSuccess, onFailure) {
-            Logger.warning('Entity.execute() is deprecated, Use Entity.requery() instead.');
-            requery(onSuccess, onFailure);
-        }
-
-        function requestData(params, onSuccess, onFailure) {
-            if (onSuccess) {
-                queryProxy.requestData(params, onSuccess, onFailure);
-            } else {
-                throw "Synchronous Entity.query() method is not supported within browser client. So 'onSuccess' is required argument.";
-            }
-        }
-
-        function requery(onSuccess, onFailure) {
-            if (onSuccess) {
-                const toInvalidate = collectRight();
-                toInvalidate.push(self);
-                model.start(toInvalidate, onSuccess, onFailure);
-            } else {
-                throw "Synchronous Entity.requery() method is not supported within browser client. So 'onSuccess' is required argument.";
-            }
+        function requery(manager) {
+            const toInvalidate = [self];
+            toInvalidate.push(...collectRight());
+            return model.start(toInvalidate, manager);
         }
 
         function append(data) {
             acceptData(data, false);
         }
 
-        function update(params, onSuccess, onFailure) {
-            if (onSuccess) {
-                const command = queryProxy.prepareCommandRequest(params);
-                Requests.requestCommit([command], onSuccess, onFailure);
-            } else {
-                throw "Synchronous Entity.update() method is not supported within browser client. So 'onSuccess' is required argument.";
-            }
+        function update(params, manager) {
+            const command = queryProxy.prepareCommandRequest(params);
+            return Requests.requestCommit([command], manager);
         }
 
         function isPk(aPropertyName) {
@@ -868,11 +826,6 @@ class Entity extends Array {
         Object.defineProperty(this, 'start', {
             get: function () {
                 return start;
-            }
-        });
-        Object.defineProperty(this, 'cancel', {
-            get: function () {
-                return cancel;
             }
         });
         Object.defineProperty(this, 'invalidate', {
