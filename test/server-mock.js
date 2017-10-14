@@ -36,7 +36,7 @@ export default () => {
 
         Invoke.later(() => {
             if (isHandledUrl(xhr.url)) {
-                if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqAppQuery}&__queryId=pets`)) {
+                if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqAppEntity}&__queryId=pets`)) {
                     respondObj(xhr, {
                         appelement: 'pets',
                         title: 'pets entity',
@@ -49,7 +49,14 @@ export default () => {
                         ],
                         parameters: []
                     });
-                } else if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqAppQuery}&__queryId=all-owners`)) {
+                } else if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqAppEntity}&__queryId=fake-pets`)) {
+                    respondObj(xhr, {
+                        appelement: 'fake-pets',
+                        title: 'Fake pets entity',
+                        fields: [],
+                        parameters: []
+                    });
+                } else if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqAppEntity}&__queryId=all-owners`)) {
                     respondObj(xhr, {
                         appelement: 'all-owners',
                         title: 'Owners entity',

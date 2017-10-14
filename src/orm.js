@@ -7,52 +7,44 @@ import readModelDocument from './model-reader';
 
 const global = window;
 
-const SERVER_ENTITY_TOUCHED_NAME = 'Entity ';
+const SERVER_ENTITY = 'Entity ';
 
 const loadedEntities = new Map();
 
-function loadEntities(entitiesNames) {
-    return Promise.all(entitiesNames.map(entityName => {
-        Logger.info(`Loading ${SERVER_ENTITY_TOUCHED_NAME}${entityName} ...`);
-        return Requests.requestEntity(entityName)
-                .then(entity => {
-                    loadedEntities.set(entityName, entity);
-                })
-                .catch(reason => {
-                    Logger.severe(reason);
-                    throw reason;
-                });
-    }));
+function loadEntities(entitiesNames, manager) {
+    const entityRequests = [];
+    if (manager) {
+        manager.cancel = function () {
+            entityRequests.forEach(entityRequest => {
+                entityRequest.cancel();
+            });
+        };
+    }
+    return Promise.all(entitiesNames
+            .map(entityName => {
+                Logger.info(`Loading ${SERVER_ENTITY}${entityName} ...`);
+                const entityRequest = {};
+                entityRequests.push(entityRequest);
+                return Requests.requestEntity(entityName, entityRequest)
+                        .then(entity => {
+                            Logger.info(`${SERVER_ENTITY}${entityName} ...Loaded`);
+                            loadedEntities.set(entityName, entity);
+                            return entity;
+                        })
+                        .catch(reason => {
+                            Logger.severe(reason);
+                            throw reason;
+                        });
+            }));
 }
 
-function requireEntities(aEntitiesNames) {
-    let entitiesNames;
-    if (!Array.isArray(aEntitiesNames)) {
-        aEntitiesNames = `${aEntitiesNames}`;
-        if (aEntitiesNames.length > 5 && aEntitiesNames.trim().substring(0, 5).toLowerCase() === "<?xml") {
-            entitiesNames = [];
-            const pattern = /queryId="(.+?)"/ig;
-            let groups = pattern.exec(aEntitiesNames);
-            while (groups) {
-                if (groups.length > 1) {
-                    entitiesNames.push(groups[1]);
-                }
-                groups = pattern.exec(aEntitiesNames);
-            }
-        } else {
-            entitiesNames = [aEntitiesNames];
-        }
-    } else {
-        entitiesNames = aEntitiesNames;
-    }
-    const toLoad = entitiesNames.filter(entityName => !loadedEntities.has(entityName));
-    return loadEntities(toLoad).then(() => {
-        const resolved = [];
-        for (let i = 0; i < entitiesNames.length; i++) {
-            resolved.push(loadedEntities.get(entitiesNames[i]));
-        }
-        return resolved;
-    });
+function requireEntities(entitiesNames, manager) {
+    const _entitiesNames = !Array.isArray(entitiesNames) ? [entitiesNames] : entitiesNames;
+    const toLoad = _entitiesNames.filter(entityName => !loadedEntities.has(entityName));
+    return loadEntities(toLoad, manager)
+            .then(() => {
+                return _entitiesNames.map(entityName => loadedEntities.get(entityName));
+            });
 }
 
 function readModel(content) {
@@ -60,37 +52,8 @@ function readModel(content) {
     return readModelDocument(doc, null);
 }
 
-function loadModel(resourceName) {
-    Logger.warning("'loadModel' is deprecated. Use 'createModel' instead.");
-    return createModel(resourceName);
-}
-
-function createModel(resourceName) {
-    if (arguments.length > 0) {
-        if (global.septimajs && global.septimajs.getModelDocument) {
-            const modelDoc = global.septimajs.getModelDocument(resourceName);
-            if (modelDoc) {
-                return readModelDocument(modelDoc, resourceName);
-            } else {
-                throw `Model definition for resource "${resourceName}" is not found`;
-            }
-        } else {
-            throw "Fetched model definitions are not accessible. Use septima.js 'autofetch' configuration flag or call 'createModel()' without arguments to create a fresh model.";
-        }
-    } else {
-        return readModel('<?xml version="1.0" encoding="UTF-8"?><datamodel></datamodel>');
-    }
-}
-
 const module = {};
-Object.defineProperty(module, 'loadModel', {
-    enumerable: true,
-    value: loadModel
-});
-Object.defineProperty(module, 'createModel', {
-    enumerable: true,
-    value: createModel
-});
+
 Object.defineProperty(module, 'readModel', {
     enumerable: true,
     value: readModel

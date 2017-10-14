@@ -3,17 +3,17 @@ import Logger from 'septima-utils/logger';
 const releaseName = '-septima-orm-release-func';
 /** 
  * Substitutes properties of anObject with observable properties using Object.defineProperty()
- * @param anObject An object to be reorganized.
- * @param aOnChange a callback called on every change of properties.
- * @param aOnBeforeChange a callback called on before every change of properties.
+ * @param target An object to be reorganized.
+ * @param onChange a callback called on every change of properties.
+ * @param onBeforeChange a callback called on before every change of properties.
  * @returns anObject by pass for convinence.
  */
-function manageObject(anObject, aOnChange, aOnBeforeChange) {
-    if (!anObject[releaseName]) {
+function manageObject(target, onChange, onBeforeChange) {
+    if (!target[releaseName]) {
         const container = {};
-        for (let p in anObject) {
-            container[p] = anObject[p];
-            Object.defineProperty(anObject, (`${p}`), {
+        for (let p in target) {
+            container[p] = target[p];
+            Object.defineProperty(target, (`${p}`), {
                 enumerable: true,
                 configurable: true,
                 get: function () {
@@ -24,16 +24,16 @@ function manageObject(anObject, aOnChange, aOnBeforeChange) {
                     // Warning. Don't edit as !==
                     if (_oldValue != aValue) {
                         let _beforeState = null;
-                        if (aOnBeforeChange)
-                            _beforeState = aOnBeforeChange(anObject, {
-                                source: anObject,
+                        if (onBeforeChange)
+                            _beforeState = onBeforeChange(target, {
+                                source: target,
                                 propertyName: p,
                                 oldValue: _oldValue,
                                 newValue: aValue
                             });
                         container[p] = aValue;
-                        aOnChange(anObject, {
-                            source: anObject,
+                        onChange(target, {
+                            source: target,
                             propertyName: p,
                             oldValue: _oldValue,
                             newValue: aValue,
@@ -43,22 +43,20 @@ function manageObject(anObject, aOnChange, aOnBeforeChange) {
                 }
             });
         }
-        Object.defineProperty(anObject, releaseName, {
+        Object.defineProperty(target, releaseName, {
             configurable: true,
             value: function () {
-                delete anObject[releaseName];
-                for (let p in anObject) {
-                    const pValue = anObject[p];
-                    delete anObject[p];
-                    anObject[p] = pValue;
+                delete target[releaseName];
+                for (let p in target) {
+                    const pValue = target[p];
+                    delete target[p];
+                    target[p] = pValue;
                 }
             }
         });
     }
-    return {
-        release: function () {
-            anObject[releaseName]();
-        }
+    return () => {
+        target[releaseName]();
     };
 }
 
@@ -68,51 +66,51 @@ function unmanageObject(anObject) {
     }
 }
 
-function manageArray(aTarget, aOnChange) {
+function manageArray(target, spliced) {
     function pop() {
-        const popped = Array.prototype.pop.call(aTarget);
+        const popped = Array.prototype.pop.call(target);
         if (popped) {
-            aOnChange.spliced([], [popped]);
+            spliced([], [popped]);
         }
         return popped;
     }
 
     function shift() {
-        const shifted = Array.prototype.shift.call(aTarget);
+        const shifted = Array.prototype.shift.call(target);
         if (shifted) {
-            aOnChange.spliced([], [shifted]);
+            spliced([], [shifted]);
         }
         return shifted;
     }
 
     function push(...args) {
-        const newLength = aTarget.push(...args);
-        aOnChange.spliced(args, []);
+        const newLength = Array.prototype.push.apply(target, args);
+        spliced(args, []);
         if (args.length > 0)
-            aTarget.cursor = args[args.length - 1];
+            target.cursor = args[args.length - 1];
         return newLength;
     }
 
     function unshift(...args) {
-        const newLength = aTarget.unshift(...args);
-        aOnChange.spliced(args, []);
+        const newLength = Array.prototype.unshift.apply(target, args);
+        spliced(args, []);
         if (args.length > 0)
-            aTarget.cursor = args[args.length - 1];
+            target.cursor = args[args.length - 1];
         return newLength;
     }
 
     function reverse() {
-        const reversed = aTarget.reverse();
-        if (aTarget.length > 0) {
-            aOnChange.spliced([], []);
+        const reversed = Array.prototype.reverse.call(target);
+        if (target.length > 0) {
+            spliced([], []);
         }
         return reversed;
     }
 
     function sort(...args) {
-        const sorted = aTarget.sort(...args);
-        if (aTarget.length > 0) {
-            aOnChange.spliced([], []);
+        const sorted = Array.prototype.sort.apply(target, args);
+        if (target.length > 0) {
+            spliced([], []);
         }
         return sorted;
     }
@@ -120,125 +118,118 @@ function manageArray(aTarget, aOnChange) {
     function splice(...args) {
         let beginDeleteAt = args[0];
         if (beginDeleteAt < 0)
-            beginDeleteAt = aTarget.length - beginDeleteAt;
-        const deleted = aTarget.splice(...args);
+            beginDeleteAt = target.length - beginDeleteAt;
+        const deleted = Array.prototype.splice.apply(target, args);
         const added = [];
         for (let a = 2; a < args.length; a++) {
             const addedItem = args[a];
             added.push(addedItem);
         }
-        aOnChange.spliced(added, deleted);
+        spliced(added, deleted);
         return deleted;
     }
-    Object.defineProperty(aTarget, 'pop', {
+    Object.defineProperty(target, 'pop', {
         get: function () {
             return pop;
         }
     });
-    Object.defineProperty(aTarget, 'shift', {
+    Object.defineProperty(target, 'shift', {
         get: function () {
             return shift;
         }
     });
-    Object.defineProperty(aTarget, 'push', {
+    Object.defineProperty(target, 'push', {
         get: function () {
             return push;
         }
     });
-    Object.defineProperty(aTarget, 'unshift', {
+    Object.defineProperty(target, 'unshift', {
         get: function () {
             return unshift;
         }
     });
-    Object.defineProperty(aTarget, 'reverse', {
+    Object.defineProperty(target, 'reverse', {
         get: function () {
             return reverse;
         }
     });
-    Object.defineProperty(aTarget, 'sort', {
+    Object.defineProperty(target, 'sort', {
         get: function () {
             return sort;
         }
     });
-    Object.defineProperty(aTarget, 'splice', {
+    Object.defineProperty(target, 'splice', {
         get: function () {
             return splice;
         }
     });
-    return aTarget;
+    return target;
 }
-
 const addListenerName = '-septima-listener-add-func';
 const removeListenerName = '-septima-listener-remove-func';
 const fireChangeName = '-septima-change-fire-func';
 
-function listenable(aTarget) {
+function listenable(target) {
     const listeners = new Set();
-    Object.defineProperty(aTarget, addListenerName, {
+    Object.defineProperty(target, addListenerName, {
         enumerable: false,
         configurable: true,
         value: function (aListener) {
             listeners.add(aListener);
         }
     });
-    Object.defineProperty(aTarget, removeListenerName, {
+    Object.defineProperty(target, removeListenerName, {
         enumerable: false,
         configurable: true,
-        value: function (aListener) {
-            listeners.delete(aListener);
+        value: function (listener) {
+            listeners.delete(listener);
         }
     });
-    Object.defineProperty(aTarget, fireChangeName, {
+    Object.defineProperty(target, fireChangeName, {
         enumerable: false,
         configurable: true,
-        value: function (aChange) {
-            Object.freeze(aChange);
-            const _listeners = [];
-            listeners.forEach(aListener => {
-                _listeners.push(aListener);
-            });
-            _listeners.forEach(aListener => {
-                aListener(aChange);
-            });
+        value: function (change) {
+            Object.freeze(change);
+            Array.from(listeners)
+                    .forEach(listener => {
+                        listener(change);
+                    });
         }
     });
     return () => {
-        unlistenable(aTarget);
+        unlistenable(target);
     };
 }
 
-function unlistenable(aTarget) {
-    delete aTarget[addListenerName];
-    delete aTarget[removeListenerName];
+function unlistenable(target) {
+    delete target[addListenerName];
+    delete target[removeListenerName];
 }
 
-function listen(aTarget, aListener) {
-    const addListener = aTarget[addListenerName];
+function listen(target, listener) {
+    const addListener = target[addListenerName];
     if (addListener) {
-        addListener(aListener);
+        addListener(listener);
         return () => {
-            aTarget[removeListenerName](aListener);
+            target[removeListenerName](listener);
         };
     } else {
         return null;
     }
 }
 
-function unlisten(aTarget, aListener) {
-    const removeListener = aTarget[removeListenerName];
+function unlisten(target, aListener) {
+    const removeListener = target[removeListenerName];
     if (removeListener)
         removeListener(aListener);
 }
 
-function fire(aTarget, aChange) {
-    try {
-        aTarget[fireChangeName](aChange);
-    } catch (e) {
-        Logger.severe(e);
-    }
+function fire(target, change) {
+    target[fireChangeName](change);
 }
 
 const module = {};
+
 Object.defineProperty(module, 'manageObject', {
     enumerable: true,
     value: manageObject
@@ -271,4 +262,5 @@ Object.defineProperty(module, 'unlisten', {
     enumerable: true,
     value: unlisten
 });
+
 export default module;

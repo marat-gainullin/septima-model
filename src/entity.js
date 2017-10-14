@@ -423,71 +423,69 @@ class Entity extends Array {
         let onInsert = null;
         let onDelete = null;
 
-        M.manageArray(this, {
-            spliced: function (added, deleted) {
-                added.forEach(aAdded => {
-                    justInserted = aAdded;
-                    justInsertedChange = new Insert(queryProxy.entityName);
-                    keysNames.forEach(keyName => {
-                        if (!aAdded[keyName]) // If key is already assigned, than we have to preserve its value
-                            aAdded[keyName] = Id.generate();
-                    });
-                    for (let na in aAdded) {
-                        justInsertedChange.data[na] = aAdded[na];
-                    }
-                    changeLog.push(justInsertedChange);
-                    model.changeLog.push(justInsertedChange);
-                    for (let aOrdererKey in orderers) {
-                        const aOrderer = orderers[aOrdererKey];
-                        aOrderer.add(aAdded);
-                    }
-                    acceptInstance(aAdded);
-                    fireOppositeScalarsChanges(aAdded);
-                    fireOppositeCollectionsChanges(aAdded);
+        M.manageArray(this, (added, deleted) => {
+            added.forEach(aAdded => {
+                justInserted = aAdded;
+                justInsertedChange = new Insert(queryProxy.entityName);
+                keysNames.forEach(keyName => {
+                    if (!aAdded[keyName]) // If key is already assigned, than we have to preserve its value
+                        aAdded[keyName] = Id.generate();
                 });
-                deleted.forEach(aDeleted => {
-                    if (aDeleted === justInserted) {
-                        justInserted = null;
-                        justInsertedChange = null;
-                    }
-                    const deleteChange = new Delete(queryProxy.entityName);
-                    // Generate changeLog keys for delete
-                    keysNames.forEach(keyName => {
-                        // Tricky processing of primary keys modification case.
-                        deleteChange.keys[keyName] = aDeleted[keyName];
-                    });
-                    changeLog.push(deleteChange);
-                    model.changeLog.push(deleteChange);
-                    for (let aOrdererKey in orderers) {
-                        const aOrderer = orderers[aOrdererKey];
-                        aOrderer['delete'](aDeleted);
-                    }
-                    fireOppositeScalarsChanges(aDeleted);
-                    fireOppositeCollectionsChanges(aDeleted);
-                    M.unlistenable(aDeleted);
-                    M.unmanageObject(aDeleted);
+                for (let na in aAdded) {
+                    justInsertedChange.data[na] = aAdded[na];
+                }
+                changeLog.push(justInsertedChange);
+                model.changeLog.push(justInsertedChange);
+                for (let aOrdererKey in orderers) {
+                    const aOrderer = orderers[aOrdererKey];
+                    aOrderer.add(aAdded);
+                }
+                acceptInstance(aAdded);
+                fireOppositeScalarsChanges(aAdded);
+                fireOppositeCollectionsChanges(aAdded);
+            });
+            deleted.forEach(aDeleted => {
+                if (aDeleted === justInserted) {
+                    justInserted = null;
+                    justInsertedChange = null;
+                }
+                const deleteChange = new Delete(queryProxy.entityName);
+                // Generate changeLog keys for delete
+                keysNames.forEach(keyName => {
+                    // Tricky processing of primary keys modification case.
+                    deleteChange.keys[keyName] = aDeleted[keyName];
                 });
-                if (onInsert && added.length > 0) {
-                    Invoke.later(() => {
-                        onInsert({
-                            source: self,
-                            items: added
-                        });
-                    });
+                changeLog.push(deleteChange);
+                model.changeLog.push(deleteChange);
+                for (let aOrdererKey in orderers) {
+                    const aOrderer = orderers[aOrdererKey];
+                    aOrderer['delete'](aDeleted);
                 }
-                if (onDelete && deleted.length > 0) {
-                    Invoke.later(() => {
-                        onDelete({
-                            source: self,
-                            items: deleted
-                        });
+                fireOppositeScalarsChanges(aDeleted);
+                fireOppositeCollectionsChanges(aDeleted);
+                M.unlistenable(aDeleted);
+                M.unmanageObject(aDeleted);
+            });
+            if (onInsert && added.length > 0) {
+                Invoke.later(() => {
+                    onInsert({
+                        source: self,
+                        items: added
                     });
-                }
-                M.fire(self, {
-                    source: self,
-                    propertyName: 'length'
                 });
             }
+            if (onDelete && deleted.length > 0) {
+                Invoke.later(() => {
+                    onDelete({
+                        source: self,
+                        items: deleted
+                    });
+                });
+            }
+            M.fire(self, {
+                source: self,
+                propertyName: 'length'
+            });
         });
         let onScroll = null;
         let cursor = null;
@@ -515,24 +513,20 @@ class Entity extends Array {
         }
         M.listenable(this);
 
-        function find(aCriteria) {
-            if (typeof aCriteria === 'function' && Array.prototype.find) {
-                return Array.prototype.find.call(self, aCriteria);
-            } else {
-                let keys = Object.keys(aCriteria);
-                keys = keys.sort();
-                const ordererKey = keys.join(' | ');
-                let orderer = orderers[ordererKey];
-                if (!orderer) {
-                    orderer = new Orderer(keys);
-                    self.forEach(item => {
-                        orderer.add(item);
-                    });
-                    orderers[ordererKey] = orderer;
-                }
-                const found = orderer.find(aCriteria);
-                return found;
+        function findBy(aCriteria) {
+            let keys = Object.keys(aCriteria);
+            keys = keys.sort();
+            const ordererKey = keys.join(' | ');
+            let orderer = orderers[ordererKey];
+            if (!orderer) {
+                orderer = new Orderer(keys);
+                self.forEach(item => {
+                    orderer.add(item);
+                });
+                orderers[ordererKey] = orderer;
             }
+            const found = orderer.find(aCriteria);
+            return found;
         }
 
         function findByKey(aKeyValue) {
@@ -541,16 +535,11 @@ class Entity extends Array {
                 keysNames.forEach(keyName => {
                     criteria[keyName] = aKeyValue;
                 });
-                const found = find(criteria);
+                const found = findBy(criteria);
                 return found.length > 0 ? found[0] : null;
             } else {
                 return null;
             }
-        }
-
-        function findById(aKeyValue) {
-            Logger.warning('findById() is deprecated. Use findByKey() instead.');
-            return findByKey(aKeyValue);
         }
 
         const toBeDeletedMark = '-septima-to-be-deleted-mark';
@@ -660,19 +649,14 @@ class Entity extends Array {
                 return commit;
             }
         });
-        Object.defineProperty(this, 'find', {
+        Object.defineProperty(this, 'findBy', {
             get: function () {
-                return find;
+                return findBy;
             }
         });
         Object.defineProperty(this, 'findByKey', {
             get: function () {
                 return findByKey;
-            }
-        });
-        Object.defineProperty(this, 'findById', {
-            get: function () {
-                return findById;
             }
         });
         Object.defineProperty(this, 'remove', {

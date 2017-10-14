@@ -48,14 +48,21 @@ class Model {
                 return pendingMet;
             }
 
-            function invalidToPending(roundManager) {
+            function invalidToPending() {
                 const entitiesRequests = [];
-                roundManager.cancel = function () {
-                    entitiesRequests.forEach((entityRequest) => {
-                        entityRequest.cancel();
-                    });
-                };
-                return Promise.all(entities
+                if (manager) {
+                    manager.cancel = function () {
+                        entitiesRequests.forEach((entityRequest) => {
+                            entityRequest.cancel();
+                        });
+                        Array.from(entities)
+                                .filter(entity => !entity.valid)
+                                .forEach(entity => {
+                                    entity.valid = true;
+                                });
+                    };
+                }
+                return Promise.all(Array.from(entities)
                         .filter(entity => {
                             return !entity.valid && !entity.pending && entity.inRelatedValid();
                         })
@@ -76,17 +83,19 @@ class Model {
                     const reasons = [];
                     function nextRound() {
                         if (entitiesValid()) {
-                            delete manager.cancel;
+                            if (manager) {
+                                delete manager.cancel;
+                            }
                             if (reasons.length === 0) {
-                                resolve();
+                                resolve(self);
                             } else {
                                 reject(reasons);
                             }
                         } else {
-                            invalidToPending(manager)
+                            invalidToPending()
                                     .then(nextRound)
-                                    .catch((roundReasons) => {
-                                        reasons.push(...roundReasons);
+                                    .catch((roundReason) => {
+                                        reasons.push(roundReason);
                                         nextRound();
                                     });
                         }
@@ -107,8 +116,7 @@ class Model {
         }
 
         function requery(manager) {
-            const toInvalidate = Array.from(entities);
-            start(toInvalidate, manager);
+            return start(Array.from(entities), manager);
         }
 
         function revert() {
@@ -126,7 +134,7 @@ class Model {
         }
 
         function rolledback() {
-            Logger.info("Model changes are rolled back");
+            Logger.info('Model changes are rolled back');
         }
 
         function save(manager) {
@@ -146,9 +154,9 @@ class Model {
             this.enumerable = false;
             this.configurable = true;
             this.get = function () {
-                const criterion = {};
-                criterion[relation.rightField] = this[relation.leftField]; // Warning! 'this' here is data array's element!
-                const found = relation.rightEntity.find(criterion);
+                const criteria = {};
+                criteria[relation.rightField] = this[relation.leftField]; // Warning! 'this' here is data array's element!
+                const found = relation.rightEntity.findBy(criteria);
                 return found && found.length === 1 ? found[0] : null;
             };
             this.set = function (aValue) {
@@ -163,31 +171,21 @@ class Model {
             this.enumerable = false;
             this.configurable = true;
             this.get = function () {
-                const criterion = {};
+                const criteria = {};
                 const targetKey = this[relation.rightField]; // Warning! 'this' here is data array's element!
-                criterion[relation.leftField] = targetKey;
-                const found = relation.leftEntity.find(criterion);
-                M.manageArray(found, {
-                    spliced: function (added, deleted) {
-                        added.forEach(item => {
-                            item[relation.leftField] = targetKey;
-                        });
-                        deleted.forEach(item => {
-                            item[relation.leftField] = null;
-                        });
-                        M.fire(found, {
-                            source: found,
-                            propertyName: 'length'
-                        });
-                    },
-                    scrolled: function (aSubject, oldCursor, newCursor) {
-                        M.fire(found, {
-                            source: found,
-                            propertyName: 'cursor',
-                            oldValue: oldCursor,
-                            newValue: newCursor
-                        });
-                    }
+                criteria[relation.leftField] = targetKey;
+                const found = relation.leftEntity.findBy(criteria);
+                M.manageArray(found, (added, deleted) => {
+                    added.forEach(item => {
+                        item[relation.leftField] = targetKey;
+                    });
+                    deleted.forEach(item => {
+                        item[relation.leftField] = null;
+                    });
+                    M.fire(found, {
+                        source: found,
+                        propertyName: 'length'
+                    });
                 });
                 M.listenable(found);
                 return found;
