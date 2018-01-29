@@ -1,209 +1,235 @@
-import Logger from 'septima-utils/logger';
-
-const releaseName = '-septima-orm-release-func';
-/** 
- * Substitutes properties of anObject with observable properties using Object.defineProperty()
- * @param target An object to be reorganized.
- * @param onChange a callback called on every change of properties.
- * @param onBeforeChange a callback called on before every change of properties.
- * @returns anObject by pass for convinence.
- */
-function manageObject(target, onChange, onBeforeChange) {
-    if (!target[releaseName]) {
-        const container = {};
-        for (let p in target) {
-            container[p] = target[p];
-            Object.defineProperty(target, (`${p}`), {
-                enumerable: true,
-                configurable: true,
-                get: function () {
-                    return container[p];
-                },
-                set: function (aValue) {
-                    const _oldValue = container[p];
-                    // Warning. Don't edit as !==
-                    if (_oldValue != aValue) {
-                        let _beforeState = null;
-                        if (onBeforeChange)
-                            _beforeState = onBeforeChange(target, {
-                                source: target,
-                                propertyName: p,
-                                oldValue: _oldValue,
-                                newValue: aValue
-                            });
-                        container[p] = aValue;
-                        onChange(target, {
-                            source: target,
-                            propertyName: p,
-                            oldValue: _oldValue,
-                            newValue: aValue,
-                            beforeState: _beforeState
-                        });
-                    }
-                }
-            });
-        }
-        Object.defineProperty(target, releaseName, {
-            configurable: true,
-            value: function () {
-                delete target[releaseName];
-                for (let p in target) {
-                    const pValue = target[p];
-                    delete target[p];
-                    target[p] = pValue;
-                }
-            }
-        });
-    }
-    return () => {
-        target[releaseName]();
-    };
-}
-
-function unmanageObject(anObject) {
-    if (anObject[releaseName]) {
-        anObject[releaseName]();
-    }
-}
-
-function manageArray(target, spliced) {
-    function pop() {
-        const popped = Array.prototype.pop.call(target);
-        if (popped) {
-            spliced([], [popped]);
-        }
-        return popped;
-    }
-
-    function shift() {
-        const shifted = Array.prototype.shift.call(target);
-        if (shifted) {
-            spliced([], [shifted]);
-        }
-        return shifted;
-    }
-
-    function push(...args) {
-        const newLength = Array.prototype.push.apply(target, args);
-        spliced(args, []);
-        if (args.length > 0)
-            target.cursor = args[args.length - 1];
-        return newLength;
-    }
-
-    function unshift(...args) {
-        const newLength = Array.prototype.unshift.apply(target, args);
-        spliced(args, []);
-        if (args.length > 0)
-            target.cursor = args[args.length - 1];
-        return newLength;
-    }
-
-    function reverse() {
-        const reversed = Array.prototype.reverse.call(target);
-        if (target.length > 0) {
-            spliced([], []);
-        }
-        return reversed;
-    }
-
-    function sort(...args) {
-        const sorted = Array.prototype.sort.apply(target, args);
-        if (target.length > 0) {
-            spliced([], []);
-        }
-        return sorted;
-    }
-
-    function splice(...args) {
-        let beginDeleteAt = args[0];
-        if (beginDeleteAt < 0)
-            beginDeleteAt = target.length - beginDeleteAt;
-        const deleted = Array.prototype.splice.apply(target, args);
-        const added = [];
-        for (let a = 2; a < args.length; a++) {
-            const addedItem = args[a];
-            added.push(addedItem);
-        }
-        spliced(added, deleted);
-        return deleted;
-    }
-    Object.defineProperty(target, 'pop', {
-        get: function () {
-            return pop;
-        }
-    });
-    Object.defineProperty(target, 'shift', {
-        get: function () {
-            return shift;
-        }
-    });
-    Object.defineProperty(target, 'push', {
-        get: function () {
-            return push;
-        }
-    });
-    Object.defineProperty(target, 'unshift', {
-        get: function () {
-            return unshift;
-        }
-    });
-    Object.defineProperty(target, 'reverse', {
-        get: function () {
-            return reverse;
-        }
-    });
-    Object.defineProperty(target, 'sort', {
-        get: function () {
-            return sort;
-        }
-    });
-    Object.defineProperty(target, 'splice', {
-        get: function () {
-            return splice;
-        }
-    });
-    return target;
-}
 const addListenerName = '-septima-listener-add-func';
 const removeListenerName = '-septima-listener-remove-func';
 const fireChangeName = '-septima-change-fire-func';
 
-function listenable(target) {
+function manageObject(extraTraps) {
     const listeners = new Set();
-    Object.defineProperty(target, addListenerName, {
-        enumerable: false,
-        configurable: true,
-        value: function (aListener) {
-            listeners.add(aListener);
-        }
-    });
-    Object.defineProperty(target, removeListenerName, {
-        enumerable: false,
-        configurable: true,
-        value: function (listener) {
-            listeners.delete(listener);
-        }
-    });
-    Object.defineProperty(target, fireChangeName, {
-        enumerable: false,
-        configurable: true,
-        value: function (change) {
-            Object.freeze(change);
-            Array.from(listeners)
-                    .forEach(listener => {
-                        listener(change);
+
+    function fireBeforeChange(change) {
+        Object.freeze(change);
+        Array.from(listeners).forEach(listener => {
+            if (listener.beforeChange) {
+                listener.beforeChange(change);
+            }
+        });
+    }
+
+    function fireChange(change) {
+        Object.freeze(change);
+        Array.from(listeners).forEach(listener => {
+            listener.change(change);
+        });
+    }
+
+    return {
+        get: (target, key) => {
+            if (key === addListenerName) {
+                return (aListener) => {
+                    listeners.add(aListener);
+                };
+            } else if (key === removeListenerName) {
+                return (aListener) => {
+                    listeners.delete(aListener);
+                };
+            } else if (key === fireChangeName) {
+                return fireChange;
+            } else if (extraTraps && extraTraps.has(target, key)) {
+                return extraTraps.get(target, key);
+            } else {
+                return target[key];
+            }
+        },
+        set: (target, key, value) => {
+            if (extraTraps && extraTraps.has(target, key)) {
+                extraTraps.set(target, key, value);
+            } else {
+                const old = target[key];
+                // Warning! Don't edit as !==
+                if (old != value) {
+                    const beforeState = fireBeforeChange({
+                        source: target,
+                        propertyName: key,
+                        oldValue: old,
+                        newValue: value
                     });
+                    target[key] = value;
+                    fireChange({
+                        source: target,
+                        propertyName: key,
+                        oldValue: old,
+                        newValue: value,
+                        beforeState: beforeState
+                    });
+                }
+            }
+            return true;
         }
-    });
-    return () => {
-        unlistenable(target);
     };
 }
 
-function unlistenable(target) {
-    delete target[addListenerName];
-    delete target[removeListenerName];
+function manageArray() {
+    const listeners = new Set();
+
+    function fireChange(change) {
+        Object.freeze(change);
+        Array.from(listeners).forEach(listener => {
+            if (listener.change)
+                listener.change(change);
+        });
+    }
+
+    function fireSpliced(added, deleted) {
+        Object.freeze(added);
+        Object.freeze(deleted);
+        let addedProcessed;
+        Array.from(listeners).forEach(listener => {
+            addedProcessed = listener.spliced(added, deleted);
+        });
+        return addedProcessed;
+    }
+
+    function scrollTo(target, value) {
+        const old = target.cursor;
+        if (old !== value) {
+            target.cursor = value;
+            fireChange({
+                source: target,
+                propertyName: 'cursor',
+                oldValue: old,
+                newValue: value
+            });
+        }
+    }
+
+    return {
+        get: (target, key) => {
+            function pop() {
+                const popped = target.pop();
+                if (popped) {
+                    fireSpliced([], [popped]);
+                }
+                return popped;
+            }
+
+            function shift() {
+                const shifted = target.shift();
+                if (shifted) {
+                    fireSpliced([], [shifted]);
+                }
+                return shifted;
+            }
+
+            function push(...args) {
+                const newLength = Array.prototype.push.apply(target, args);
+                const added = fireSpliced(args, []);
+                if (added && added.length === args.length) {
+                    for (let i = 0; i < added.length; i++) {
+                        target[target.length - added.length + i] = added[i];
+                    }
+                }
+                if (args.length > 0)
+                    scrollTo(target, target[target.length - 1]);
+                return newLength;
+            }
+
+            function unshift(...args) {
+                const newLength = Array.prototype.unshift.apply(target, args);
+                const added = fireSpliced(args, []);
+                if (added && added.length === args.length) {
+                    for (let i = 0; i < added.length; i++) {
+                        target[i] = added[i];
+                    }
+                }
+                if (args.length > 0) {
+                    scrollTo(target, target[args.length - 1]);
+                }
+                return newLength;
+            }
+
+            function reverse() {
+                const reversed = target.reverse();
+                if (target.length > 0) {
+                    fireSpliced([], []);
+                }
+                return reversed;
+            }
+
+            function sort(...args) {
+                const sorted = Array.prototype.sort.apply(target, args);
+                if (target.length > 0) {
+                    fireSpliced([], []);
+                }
+                return sorted;
+            }
+
+            function splice(...args) {
+                const deleted = Array.prototype.splice.apply(target, args);
+                const added = [];
+                for (let a = 2; a < args.length; a++) {
+                    const addedItem = args[a];
+                    added.push(addedItem);
+                }
+                const deleteFrom = Math.min(target.length - 1, Math.max(0, args[0]));
+                const processedAdded = fireSpliced(added, deleted);
+                if (processedAdded && processedAdded.length === added.length) {
+                    for (let i = 0; i < processedAdded.length; i++) {
+                        target[deleteFrom + i] = processedAdded[i];
+                    }
+                }
+                if (added.length > 0) {
+                    scrollTo(target, target[deleteFrom + added.length - 1]);
+                }
+                return deleted;
+            }
+
+            if (key === 'pop') {
+                return pop;
+            } else if (key === 'shift') {
+                return shift;
+            } else if (key === 'push') {
+                return push;
+            } else if (key === 'unshift') {
+                return unshift;
+            } else if (key === 'reverse') {
+                return reverse;
+            } else if (key === 'sort') {
+                return sort;
+            } else if (key === 'splice') {
+                return splice;
+            } else if (key === addListenerName) {
+                return (aListener) => {
+                    listeners.add(aListener);
+                };
+            } else if (key === removeListenerName) {
+                return (aListener) => {
+                    listeners.delete(aListener);
+                };
+            } else if (key === fireChangeName) {
+                return fireChange;
+            } else {
+                return target[key];
+            }
+        },
+        set: (target, key, value) => {
+            if (target[key] !== value) {
+                if (!isNaN(key)) {
+                    const old = target[key];
+                    target[key] = value;
+                    fireSpliced([value], [old]);
+                } else {
+                    const old = target[key];
+                    target[key] = value;
+                    fireChange({
+                        source: target,
+                        propertyName: key,
+                        oldValue: old,
+                        newValue: value
+                    });
+                }
+            }
+            return true;
+        }
+    };
 }
 
 function listen(target, listener) {
@@ -234,10 +260,6 @@ Object.defineProperty(module, 'manageObject', {
     enumerable: true,
     value: manageObject
 });
-Object.defineProperty(module, 'unmanageObject', {
-    enumerable: true,
-    value: unmanageObject
-});
 Object.defineProperty(module, 'manageArray', {
     enumerable: true,
     value: manageArray
@@ -245,14 +267,6 @@ Object.defineProperty(module, 'manageArray', {
 Object.defineProperty(module, 'fire', {
     enumerable: true,
     value: fire
-});
-Object.defineProperty(module, 'listenable', {
-    enumerable: true,
-    value: listenable
-});
-Object.defineProperty(module, 'unlistenable', {
-    enumerable: true,
-    value: unlistenable
 });
 Object.defineProperty(module, 'listen', {
     enumerable: true,

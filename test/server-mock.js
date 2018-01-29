@@ -17,7 +17,7 @@ export default () => {
         {pettypes_id: 142850046716850, name: 'Mouse'}
     ];
     function isHandledUrl(url) {
-        return url.includes('application?');
+        return url.includes('data/') || url.includes('commit');
     }
 
     let xhrSpy = Sinon.useFakeXMLHttpRequest();
@@ -36,31 +36,18 @@ export default () => {
 
         Invoke.later(() => {
             if (isHandledUrl(xhr.url)) {
-                if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqAppEntity}&__queryId=pets`)) {
-                    respondObj(xhr, {
-                        appelement: 'pets',
-                        title: 'pets entity',
-                        fields: [
+                if (xhr.url.endsWith('schema/pets')) {
+                    respondObj(xhr, [
                             {name: 'pets_id', description: 'Pet primary key', type: 'Number', pk: true, nullable: false},
                             {name: 'type_id', description: "Pet's type reference", type: 'Number', nullable: false},
                             {name: 'owner_id', description: 'Owner reference field', type: 'Number', nullable: false},
                             {name: 'name', description: "Pet's name", type: 'String', nullable: false},
                             {name: 'birthdate', description: "Pet's bith date", type: 'Date', nullable: true}
-                        ],
-                        parameters: []
-                    });
-                } else if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqAppEntity}&__queryId=fake-pets`)) {
-                    respondObj(xhr, {
-                        appelement: 'fake-pets',
-                        title: 'Fake pets entity',
-                        fields: [],
-                        parameters: []
-                    });
-                } else if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqAppEntity}&__queryId=all-owners`)) {
-                    respondObj(xhr, {
-                        appelement: 'all-owners',
-                        title: 'Owners entity',
-                        fields: [
+                        ]);
+                } else if (xhr.url.endsWith('schema/fake-pets')) {
+                    respondObj(xhr, []);
+                } else if (xhr.url.endsWith('schema/all-owners')) {
+                    respondObj(xhr, [
                             {name: 'owners_id', description: 'Owner primary key', type: 'Number', pk: true, nullable: false},
                             {name: 'firstname', description: "Owner's first name", type: 'String', nullable: false},
                             {name: 'lastname', description: "Owner's last name", type: 'String', nullable: true},
@@ -68,25 +55,26 @@ export default () => {
                             {name: 'city', description: "Owner's city", type: 'String', nullable: true},
                             {name: 'telephone', description: "Owner's phone number", type: 'String', nullable: true},
                             {name: 'email', description: "Owner's email", type: 'String', nullable: true}
-                        ],
-                        parameters: []
-                    });
-                } else if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqExecuteQuery}&__queryId=pets`)) {
+                        ]);
+                } else if (xhr.url.endsWith('data/pets')) {
                     respondObj(xhr, petsData);
-                } else if (xhr.url.includes(`application?__type=${Requests.RequestTypes.rqExecuteQuery}&__queryId=pets-of-owner`)) {
+                } else if (xhr.url.includes('data/pets-of-owner')) {
                     const ownerKey = xhr.url.match(/ownerKey=([\dnul]+)/)[1];
                     respondObj(xhr, petsData.filter((pet) => {
                         return pet.owner_id == ownerKey;
                     }));
-                } else if (xhr.url.includes(`application?__type=${Requests.RequestTypes.rqExecuteQuery}&__queryId=pet-of-owner`)) {
+                } else if (xhr.url.includes('data/pet-of-owner')) {
                     const ownerKey = xhr.url.match(/ownerKey=([\dnul]+)/)[1];
                     const petKey = xhr.url.match(/petKey=([\dnul]+)/)[1];
                     respondObj(xhr, petsData.filter((pet) => {
                         return pet.owner_id == ownerKey && pet.pets_id == petKey;
                     }));
-                } else if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqExecuteQuery}&__queryId=all-owners`)) {
+                } else if (xhr.url.endsWith('data/all-owners')) {
                     respondObj(xhr, ownersData);
-                } else if (xhr.url.endsWith(`application?__type=${Requests.RequestTypes.rqCommit}`)) {
+                } else if (xhr.url.endsWith('data/add-pet')) {
+                    xhr.respond(404, {"Content-Type": "application/json"},
+                        JSON.stringify({error: "Collection 'add-pet' is not found"}));
+                } else if (xhr.url.endsWith('commit')) {
                     if (xhr.readyState !== 0) {
                         const log = JSON.parse(xhr.requestBody);
                         let affected = 0;

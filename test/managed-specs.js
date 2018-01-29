@@ -4,51 +4,19 @@ import Id from 'septima-utils/id';
 import M from '../src/managed';
 
 describe('Managed Objects', () => {
-    it('ManageObject.1', () => {
-        const owner = {id: Id.generate(), name: 'Christy'};
-        let changes = 0;
-        let beforeChanges = 0;
-        M.manageObject(owner, () => {
-            changes++;
-        }, () => {
-            beforeChanges++;
-        });
-
-        owner.name += '33';
-        expect(changes).toEqual(1);
-        expect(beforeChanges).toEqual(1);
-
-        M.unmanageObject(owner);
-        owner.name += '4';
-        expect(changes).toEqual(1);
-        expect(beforeChanges).toEqual(1);
-    });
-    it('ManageObject.2', () => {
-        const owner = {id: Id.generate(), name: 'Christy'};
-        let changes = 0;
-        let beforeChanges = 0;
-        const unmanage = M.manageObject(owner, () => {
-            changes++;
-        }, () => {
-            beforeChanges++;
-        });
-
-        owner.name += '33';
-        expect(changes).toEqual(1);
-        expect(beforeChanges).toEqual(1);
-
-        unmanage();
-        owner.name += '4';
-        expect(changes).toEqual(1);
-        expect(beforeChanges).toEqual(1);
-    });
     it('Listenable.1', () => {
-        const owner = {id: Id.generate(), name: 'Christy'};
+        const owner = new Proxy({id: Id.next(), name: 'Christy'}, M.manageObject());
+        let beforeChanges = 0;
         let changes = 0;
-        M.listenable(owner);
-        M.listen(owner, () => {
-            changes++;
-        });
+        const listener = {
+            beforeChange: () => {
+                beforeChanges++;
+            },
+            change: () => {
+                changes++;
+            }
+        };
+        M.listen(owner, listener);
 
         const oldName = owner.name;
         owner.name += '33';
@@ -58,19 +26,24 @@ describe('Managed Objects', () => {
             oldValue: oldName,
             newValue: owner.name
         });
-        expect(changes).toEqual(1);
+        expect(beforeChanges).toEqual(1);
+        expect(changes).toEqual(2);
 
-        M.unlisten(owner);
-        M.unlistenable(owner);
+        M.unlisten(owner, listener);
         owner.name += '4';
-        expect(changes).toEqual(1);
+        expect(changes).toEqual(2);
     });
     it('Listenable.2', () => {
-        const owner = {id: Id.generate(), name: 'Christy'};
+        const owner = new Proxy({id: Id.next(), name: 'Christy'}, M.manageObject());
+        let beforeChanges = 0;
         let changes = 0;
-        const unlistenable = M.listenable(owner);
-        const unlisten = M.listen(owner, () => {
-            changes++;
+        const unlisten = M.listen(owner, {
+            beforeChange: () => {
+                beforeChanges++;
+            },
+            change: () => {
+                changes++;
+            }
         });
 
         const oldName = owner.name;
@@ -81,28 +54,26 @@ describe('Managed Objects', () => {
             oldValue: oldName,
             newValue: owner.name
         });
-        expect(changes).toEqual(1);
+        expect(beforeChanges).toEqual(1);
+        expect(changes).toEqual(2);
 
         unlisten();
-        unlistenable();
         owner.name += '4';
-        expect(changes).toEqual(1);
+        expect(changes).toEqual(2);
     });
 
     const samples = [
-        {id: Id.generate(), name: 'Bob'},
-        {id: Id.generate(), name: 'Rob'},
-        {id: Id.generate(), name: 'Til'},
-        {id: Id.generate(), name: 'Sven'},
-        {id: Id.generate(), name: 'Kitana'}
+        {id: Id.next(), name: 'Bob'},
+        {id: Id.next(), name: 'Rob'},
+        {id: Id.next(), name: 'Til'},
+        {id: Id.next(), name: 'Sven'},
+        {id: Id.next(), name: 'Kitana'}
     ];
     it('ManagedArray.push|pop', () => {
-        const data = samples.slice(0, samples.length);
-        M.manageArray(data, (added, removed) => {
-        });
+        const data = new Proxy(samples.slice(0, samples.length), M.manageArray());
         data.push(
-                {id: Id.generate(), name: 'Christy'},
-                {id: Id.generate(), name: 'Jane'}
+            {id: Id.next(), name: 'Christy'},
+            {id: Id.next(), name: 'Jane'}
         );
         expect(data.length).toEqual(samples.length + 2);
         data.pop();
@@ -111,12 +82,10 @@ describe('Managed Objects', () => {
         expect(data.length).toEqual(samples.length);
     });
     it('ManagedArray.unshift|shift', () => {
-        const data = samples.slice(0, samples.length);
-        M.manageArray(data, (added, removed) => {
-        });
+        const data = new Proxy(samples.slice(0, samples.length), M.manageArray());
         data.unshift(
-                {id: Id.generate(), name: 'Christy'},
-                {id: Id.generate(), name: 'Jane'}
+            {id: Id.next(), name: 'Christy'},
+            {id: Id.next(), name: 'Jane'}
         );
         expect(data.length).toEqual(samples.length + 2);
         data.shift();
@@ -125,50 +94,47 @@ describe('Managed Objects', () => {
         expect(data.length).toEqual(samples.length);
     });
     it('ManagedArray.reverse', () => {
-        const data = samples.slice(0, samples.length);
-        M.manageArray(data, (added, removed) => {
-        });
+        const samplesCopy = samples.slice(0, samples.length);
+        const data = new Proxy(samplesCopy, M.manageArray());
         expect(data[0].name).toEqual(samples[0].name);
         expect(data[1].name).toEqual(samples[1].name);
         const reversed = data.reverse();
         expect(reversed[0].name).toEqual(samples[samples.length - 1].name);
         expect(reversed[reversed.length - 1].name).toEqual(samples[0].name);
-        expect(reversed).toBe(data);
+        expect(reversed).toBe(samplesCopy);
     });
     it('ManagedArray.sort', () => {
-        const data = samples.slice(0, samples.length);
-        M.manageArray(data, (added, removed) => {
-        });
+        const samplesCopy = samples.slice(0, samples.length);
+        const data = new Proxy(samplesCopy, M.manageArray());
         expect(data[0].name).toEqual(samples[0].name);
         expect(data[1].name).toEqual(samples[1].name);
         const sorted = data.sort((o1, o2) => {
             return o1.name > o2.name;
         });
         expect(sorted
-                .map((item) => {
-                    return item.name;
-                }))
-                .toEqual([
-                    'Bob',
-                    'Kitana',
-                    'Rob',
-                    'Sven',
-                    'Til'
-                ]);
-        expect(sorted).toBe(data);
+            .map((item) => {
+                return item.name;
+            }))
+            .toEqual([
+                'Bob',
+                'Kitana',
+                'Rob',
+                'Sven',
+                'Til'
+            ]);
+        expect(sorted).toBe(samplesCopy);
     });
 
     it('ManagedArray.splice', () => {
-        const data = samples.slice(0, samples.length);
-        M.manageArray(data, (added, removed) => {
-        });
+        const data = new Proxy(samples.slice(0, samples.length), M.manageArray());
         expect(data).toEqual(samples);
         const deleted = data.splice(0, data.length);
         expect(deleted).toEqual(samples);
         const deleted1 = data.splice(0, 0, ...deleted);
         expect(deleted1.length).toEqual(0);
+        samples.cursor = data.cursor;
         expect(data).toEqual(samples);
-        const deleted2 = data.splice(0, 1, {id: Id.generate(), name: 'Bob-Next'});
+        const deleted2 = data.splice(0, 1, {id: Id.next(), name: 'Bob-Next'});
         expect(deleted2.length).toEqual(1);
         expect(deleted2[0].name).toEqual('Bob');
         expect(data[0].name).toEqual('Bob-Next');

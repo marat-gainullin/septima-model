@@ -16,6 +16,7 @@ class Orderer {
         this.inKeys = aKeyName => keyNames.includes(aKeyName);
 
         const map = new Map();
+
         this.add = anObject => {
             const key = calcKey(anObject);
             let subset = map.get(key);
@@ -25,7 +26,7 @@ class Orderer {
             }
             subset.add(anObject);
         };
-        this.delete = anObject => {
+        this.remove = anObject => {
             const key = calcKey(anObject);
             const subset = map.get(key);
             if (subset) {
