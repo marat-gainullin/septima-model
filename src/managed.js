@@ -83,7 +83,10 @@ function manageArray() {
         Object.freeze(deleted);
         const addedProcessed = [];
         Array.from(listeners).forEach(listener => {
-            addedProcessed.push(...(listener.spliced ? listener.spliced(added, deleted) : []));
+            const processed = listener.spliced ? listener.spliced(added, deleted) : [];
+            if (processed) {
+                addedProcessed.push(...processed);
+            }
         });
         return addedProcessed;
     }
