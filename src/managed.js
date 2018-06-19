@@ -81,9 +81,9 @@ function manageArray() {
     function fireSpliced(added, deleted) {
         Object.freeze(added);
         Object.freeze(deleted);
-        let addedProcessed;
+        const addedProcessed = [];
         Array.from(listeners).forEach(listener => {
-            addedProcessed = listener.spliced(added, deleted);
+            addedProcessed.push(...(listener.spliced ? listener.spliced(added, deleted) : []));
         });
         return addedProcessed;
     }

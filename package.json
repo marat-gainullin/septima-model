@@ -1,7 +1,7 @@
 {
   "name": "septima-model",
-  "version": "0.0.16",
-  "description": "Septima data requests manager with relations.",
+  "version": "0.0.17",
+  "description": "Septima data requests manager and ORM-like keys dereferencing.",
   "main": "index.js",
   "repository": "https://github.com/marat-gainullin/septima-model.git",
   "author": "marat-gainullin <mg@altsoft.biz>",
