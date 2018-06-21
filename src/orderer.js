@@ -45,6 +45,12 @@ class Orderer {
                 return Array.from(subset);
             }
         };
+        this.forEach = action => {
+            map.forEach((vs, ks, es) => {
+                vs.forEach((v, k, e) => action(v));
+            })
+        };
     }
 }
+
 export default Orderer;
