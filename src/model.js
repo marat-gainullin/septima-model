@@ -7,15 +7,13 @@ class Model {
     }
 
     dropChanges() {
-        this.changeLog.splice(0, this.changeLog.length);
+        this.changeLog = [];
     }
 
     save(manager) {
-        return Requests.requestCommit(this.changeLog, manager)
-            .then(touched => {
-                this.dropChanges();
-                return touched;
-            });
+        const commitPromise = Requests.requestCommit(this.changeLog, manager);
+        this.dropChanges();
+        return commitPromise;
     }
 }
 
