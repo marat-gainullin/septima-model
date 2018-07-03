@@ -1,6 +1,6 @@
 {
   "name": "septima-model",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "description": "Septima data requests manager and ORM-like keys dereferencing.",
   "main": "index.js",
   "repository": "https://github.com/marat-gainullin/septima-model.git",
@@ -41,7 +41,7 @@
     "yargs": "^9.0.1"
   },
   "dependencies": {
-    "septima-remote": "0.0.19",
+    "septima-remote": "0.0.20",
     "septima-utils": "0.0.5"
   }
 }

@@ -48,7 +48,7 @@ class Orderer {
         this.forEach = action => {
             map.forEach((vs, ks, es) => {
                 vs.forEach((v, k, e) => action(v));
-            })
+            });
         };
     }
 }
