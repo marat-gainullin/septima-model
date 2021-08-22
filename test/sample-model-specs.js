@@ -7,7 +7,7 @@ import Entity from '../src/entity';
 
 import mockSeptimaServer from './server-mock';
 
-describe('Model, entities and orderers. ', () => {
+describe('Model, entities and ordered changes. ', () => {
     beforeAll(() => {
         mockSeptimaServer();
     });
@@ -155,7 +155,7 @@ describe('Model, entities and orderers. ', () => {
             })
             .catch(done.fail);
     });
-    it("'Model.save()'", done => {
+    it("'Model.save()'", () => {
         const newOwnerId = Id.next();
         let updatedOwnerId;
         let upatedFirstName;
@@ -190,9 +190,7 @@ describe('Model, entities and orderers. ', () => {
                 const justAddedOwner = model.owners.findByKey(newOwnerId);
                 expect(justAddedOwner).toBeDefined();
                 expect(justAddedOwner.lastname).toEqual(`test-owner-surname-${newOwnerId}`);
-                done();
             })
-            .catch(done.fail);
     });
 
     function localPetsModel() {

@@ -109,7 +109,7 @@ describe('Managed Objects', () => {
         expect(data[0].name).toEqual(samples[0].name);
         expect(data[1].name).toEqual(samples[1].name);
         const sorted = data.sort((o1, o2) => {
-            return o1.name > o2.name;
+            return o1.name < o2.name ? -1 : o1.name > o2.name ? 1 : 0;
         });
         expect(sorted
             .map((item) => {
